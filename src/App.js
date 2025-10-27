@@ -1,7 +1,45 @@
-import React, { useState } from 'react';
-import { Calendar, ChevronLeft, ChevronRight, Trash2, Printer } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { supabase } from './supabaseClient';
+import Auth from './Auth';
+import { Calendar, ChevronLeft, ChevronRight, Trash2, Printer, LogOut } from 'lucide-react';
 
-const HolidayTracker = () => {
+function App() {
+  const [session, setSession] = useState(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    // Get initial session
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      setSession(session);
+      setLoading(false);
+    });
+
+    // Listen for auth changes
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange((_event, session) => {
+      setSession(session);
+    });
+
+    return () => subscription.unsubscribe();
+  }, []);
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center">
+        <div className="text-xl text-gray-600">Loading...</div>
+      </div>
+    );
+  }
+
+  if (!session) {
+    return <Auth />;
+  }
+
+  return <HolidayTracker session={session} />;
+}
+
+function HolidayTracker({ session }) {
   const categories = [
     'Bank Holidays',
     'Birthday',
@@ -11,21 +49,9 @@ const HolidayTracker = () => {
     'Winter Holidays'
   ].sort();
 
-  const [allowances, setAllowances] = useState({
-    'Bank Holidays': 8,
-    'Volunteer Days': 2,
-    'Wellness Days': 3,
-    'Birthday': 1,
-    'Vacation': 20,
-    'Winter Holidays': 5
-  });
-
-  const [holidays, setHolidays] = useState([
-    { id: 1, category: 'Vacation', days: 1, status: 'spent', date: '2025-03-15' },
-    { id: 2, category: 'Bank Holidays', days: 1, status: 'spent', date: '2025-01-01' },
-    { id: 3, category: 'Vacation', days: 1, status: 'requested', date: '2025-07-10' }
-  ]);
-
+  const [allowances, setAllowances] = useState({});
+  const [holidays, setHolidays] = useState([]);
+  const [loading, setLoading] = useState(true);
   const [currentDate, setCurrentDate] = useState(new Date(2025, 9, 1));
   const [selectedCategory, setSelectedCategory] = useState('Bank Holidays');
   const [showYearView, setShowYearView] = useState(false);
@@ -34,6 +60,144 @@ const HolidayTracker = () => {
   const [printIncludeBreakdown, setPrintIncludeBreakdown] = useState(false);
   const [printIncludeEntries, setPrintIncludeEntries] = useState(false);
 
+  // Load data from Supabase
+  useEffect(() => {
+    loadAllowances();
+    loadHolidays();
+  }, []);
+
+  const loadAllowances = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('allowances')
+        .select('*')
+        .eq('user_id', session.user.id);
+
+      if (error) throw error;
+
+      // Convert array to object
+      const allowancesObj = {};
+      data.forEach(item => {
+        allowancesObj[item.category] = item.total;
+      });
+
+      // Set defaults for missing categories
+      categories.forEach(cat => {
+        if (!allowancesObj[cat]) {
+          allowancesObj[cat] = getDefaultAllowance(cat);
+        }
+      });
+
+      setAllowances(allowancesObj);
+    } catch (error) {
+      console.error('Error loading allowances:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const loadHolidays = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('holidays')
+        .select('*')
+        .eq('user_id', session.user.id);
+
+      if (error) throw error;
+
+      setHolidays(data.map(h => ({
+        id: h.id,
+        category: h.category,
+        days: h.days,
+        status: h.status,
+        date: h.date
+      })));
+    } catch (error) {
+      console.error('Error loading holidays:', error);
+    }
+  };
+
+  const getDefaultAllowance = (category) => {
+    const defaults = {
+      'Bank Holidays': 8,
+      'Volunteer Days': 2,
+      'Wellness Days': 3,
+      'Birthday': 1,
+      'Vacation': 20,
+      'Winter Holidays': 5
+    };
+    return defaults[category] || 0;
+  };
+
+  const updateAllowance = async (category, value) => {
+    const newValue = parseInt(value) || 0;
+    setAllowances({ ...allowances, [category]: newValue });
+
+    try {
+      const { error } = await supabase
+        .from('allowances')
+        .upsert({
+          user_id: session.user.id,
+          category,
+          total: newValue
+        });
+
+      if (error) throw error;
+    } catch (error) {
+      console.error('Error updating allowance:', error);
+    }
+  };
+
+  const addHoliday = async (year, month, day, category, status) => {
+    const dateStr = formatDate(year, month, day);
+    
+    try {
+      const { data, error } = await supabase
+        .from('holidays')
+        .insert({
+          user_id: session.user.id,
+          category,
+          days: 1,
+          status,
+          date: dateStr
+        })
+        .select()
+        .single();
+
+      if (error) throw error;
+
+      setHolidays([...holidays, {
+        id: data.id,
+        category: data.category,
+        days: data.days,
+        status: data.status,
+        date: data.date
+      }]);
+    } catch (error) {
+      console.error('Error adding holiday:', error);
+    }
+  };
+
+  const deleteHoliday = async (id) => {
+    try {
+      const { error } = await supabase
+        .from('holidays')
+        .delete()
+        .eq('id', id);
+
+      if (error) throw error;
+
+      setHolidays(holidays.filter(h => h.id !== id));
+    } catch (error) {
+      console.error('Error deleting holiday:', error);
+    }
+  };
+
+  const handleSignOut = async () => {
+    await supabase.auth.signOut();
+  };
+
+  // Rest of your existing functions (getDaysInMonth, formatDate, etc.)
   const getDaysInMonth = (date) => {
     const year = date.getFullYear();
     const month = date.getMonth();
@@ -72,20 +236,14 @@ const HolidayTracker = () => {
     const existing = getHolidayForDate(dateStr);
     
     if (existing) {
-      setHolidays(holidays.filter(h => h.id !== existing.id));
+      deleteHoliday(existing.id);
     } else {
       if (!canAddHoliday(selectedCategory)) {
         return;
       }
       
       const status = determineStatus(year, month, day);
-      setHolidays([...holidays, {
-        id: Date.now(),
-        category: selectedCategory,
-        days: 1,
-        status: status,
-        date: dateStr
-      }]);
+      addHoliday(year, month, day, selectedCategory, status);
     }
   };
 
@@ -117,14 +275,6 @@ const HolidayTracker = () => {
     }, 100);
   };
 
-  const deleteHoliday = (id) => {
-    setHolidays(holidays.filter(h => h.id !== id));
-  };
-
-  const updateAllowance = (category, value) => {
-    setAllowances({ ...allowances, [category]: parseInt(value) || 0 });
-  };
-
   const calculateStats = (category) => {
     const categoryHolidays = holidays.filter(h => h.category === category);
     const spent = categoryHolidays
@@ -133,7 +283,7 @@ const HolidayTracker = () => {
     const requested = categoryHolidays
       .filter(h => h.status === 'requested')
       .reduce((sum, h) => sum + h.days, 0);
-    const total = allowances[category];
+    const total = allowances[category] || 0;
     const pending = total - spent - requested;
     
     return { total, spent, requested, pending };
@@ -196,6 +346,14 @@ const HolidayTracker = () => {
     );
   };
 
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center">
+        <div className="text-xl text-gray-600">Loading your data...</div>
+      </div>
+    );
+  }
+
   const totals = calculateTotals();
   const { daysInMonth, startingDayOfWeek, year, month } = getDaysInMonth(currentDate);
   const monthName = currentDate.toLocaleString('default', { month: 'long', year: 'numeric' });
@@ -203,36 +361,22 @@ const HolidayTracker = () => {
   const monthNames = ['January', 'February', 'March', 'April', 'May', 'June', 
                       'July', 'August', 'September', 'October', 'November', 'December'];
 
+  // Flattened layout: single outer frame containing all content
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 p-2 sm:p-6">
       <style>{`
         @media print {
-          body {
-            background: white !important;
-          }
-          .no-print {
-            display: none !important;
-          }
-          .print-only {
-            display: block !important;
-          }
-          .bg-gradient-to-br {
-            background: white !important;
-          }
-          .shadow-lg {
-            box-shadow: none !important;
-          }
-          .hover\\:scale-105:hover {
-            transform: none !important;
-          }
-          button {
-            pointer-events: none;
-          }
+          body { background: white !important; }
+          .no-print { display: none !important; }
+          .print-only { display: block !important; }
+          .bg-gradient-to-br { background: white !important; }
+          .shadow-lg { box-shadow: none !important; }
+          .hover\\:scale-105:hover { transform: none !important; }
+          button { pointer-events: none; }
         }
-        .print-only {
-          display: none;
-        }
+        .print-only { display: none; }
       `}</style>
+
       <div className="max-w-6xl mx-auto">
         <div className="bg-white rounded-lg shadow-lg p-4 sm:p-8 mb-6">
           <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between mb-6 gap-3">
@@ -240,13 +384,22 @@ const HolidayTracker = () => {
               <Calendar className="w-6 h-6 sm:w-8 sm:h-8 text-indigo-600" />
               <h1 className="text-2xl sm:text-3xl font-bold text-gray-800">Holiday Tracker</h1>
             </div>
-            <button
-              onClick={() => setShowPrintOptions(!showPrintOptions)}
-              className="no-print flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white px-3 sm:px-4 py-2 rounded-lg transition-colors text-sm sm:text-base"
-            >
-              <Printer className="w-4 h-4 sm:w-5 sm:h-5" />
-              Print
-            </button>
+            <div className="flex gap-2">
+              <button
+                onClick={() => setShowPrintOptions(!showPrintOptions)}
+                className="no-print flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white px-3 sm:px-4 py-2 rounded-lg transition-colors text-sm sm:text-base"
+              >
+                <Printer className="w-4 h-4 sm:w-5 sm:h-5" />
+                Print
+              </button>
+              <button
+                onClick={handleSignOut}
+                className="no-print flex items-center gap-2 bg-gray-600 hover:bg-gray-700 text-white px-3 sm:px-4 py-2 rounded-lg transition-colors text-sm sm:text-base"
+              >
+                <LogOut className="w-4 h-4 sm:w-5 sm:h-5" />
+                Sign Out
+              </button>
+            </div>
           </div>
 
           {showPrintOptions && (
