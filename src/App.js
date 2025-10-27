@@ -1,5 +1,3 @@
-import logo from './logo.svg';
-import './App.css';
 import React, { useState } from 'react';
 import { Calendar, ChevronLeft, ChevronRight, Trash2, Printer } from 'lucide-react';
 
