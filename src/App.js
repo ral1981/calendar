@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from './supabaseClient';
 import Auth from './Auth';
-import { Calendar, ChevronLeft, ChevronRight, Trash2, Printer, LogOut } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Trash2, Printer, LogOut, CalendarSearch } from 'lucide-react';
 
 function App() {
   const [session, setSession] = useState(null);
@@ -24,7 +24,7 @@ function App() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center">
+      <div className="min-h-screen bg-gradient-to-br from-indigo-50 via-blue-50 to-cyan-50 flex items-center justify-center">
         <div className="text-xl text-gray-600">Loading...</div>
       </div>
     );
@@ -270,12 +270,12 @@ function HolidayTracker({ session }) {
 
   const getCategoryColor = (category) => {
     const colors = {
-      'Bank Holidays': 'bg-purple-500',
-      'Volunteer Days': 'bg-green-500',
+      'Bank Holidays': 'bg-indigo-500',
+      'Volunteer Days': 'bg-teal-500',
       'Wellness Days': 'bg-blue-500',
-      'Birthday': 'bg-pink-500',
-      'Vacation': 'bg-orange-500',
-      'Winter Holidays': 'bg-cyan-500'
+      'Birthday': 'bg-violet-500',
+      'Vacation': 'bg-cyan-500',
+      'Winter Holidays': 'bg-sky-500'
     };
     return colors[category] || 'bg-gray-500';
   };
@@ -304,7 +304,7 @@ function HolidayTracker({ session }) {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center">
+      <div className="min-h-screen bg-gradient-to-br from-indigo-50 via-blue-50 to-cyan-50 flex items-center justify-center">
         <div className="text-xl text-gray-600">Loading your data...</div>
       </div>
     );
@@ -317,7 +317,7 @@ function HolidayTracker({ session }) {
   const monthNames = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 p-2 sm:p-6">
+    <div className="min-h-screen bg-gradient-to-br from-indigo-50 via-blue-50 to-cyan-50 p-2 sm:p-6">
       <style>{`
         @media print {
           body { background: white !important; }
@@ -331,26 +331,38 @@ function HolidayTracker({ session }) {
       `}</style>
       
       <div className="max-w-6xl mx-auto">
-        <div className="bg-white rounded-lg shadow-lg p-4 sm:p-8 mb-6">
-          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between mb-6 gap-3">
+        <div className="bg-white rounded-lg shadow-lg p-4 sm:p-6 mb-6">
+          <div className="flex flex-col sm:flex-row items-center justify-between gap-4 mb-6">
             <div className="flex items-center gap-3">
-              <Calendar className="w-6 h-6 sm:w-8 sm:h-8 text-indigo-600" />
-              <h1 className="text-2xl sm:text-3xl font-bold text-gray-800">Holiday Tracker</h1>
+              <div className="relative">
+                <div className="absolute inset-0 bg-gradient-to-br from-indigo-500 via-blue-500 to-cyan-500 rounded-lg blur-md opacity-45"></div>
+                <div className="relative bg-gradient-to-br from-indigo-500 via-blue-500 to-cyan-500 rounded-lg p-2 shadow">
+                  <CalendarSearch className="w-5 h-5 text-white" />
+                </div>
+              </div>
+              <h1 className="text-xl font-bold text-gray-800">Holiday Tracker</h1>
             </div>
-            <div className="flex gap-2">
+            <div className="flex items-center gap-2">
               <button
-                onClick={() => setShowPrintOptions(!showPrintOptions)}
-                className="no-print flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white px-3 sm:px-4 py-2 rounded-lg transition-colors text-sm sm:text-base"
+                onClick={() => {
+                  setShowPrintOptions(!showPrintOptions);
+                  if (showPrintOptions) {
+                    setPrintIncludeTotals(false);
+                    setPrintIncludeBreakdown(false);
+                    setPrintIncludeEntries(false);
+                  }
+                }}
+                className="no-print p-2 hover:bg-gray-100 rounded-lg transition-colors"
+                title="Print options"
               >
-                <Printer className="w-4 h-4 sm:w-5 sm:h-5" />
-                Print
+                <Printer className="w-5 h-5 text-gray-600" />
               </button>
               <button
                 onClick={handleSignOut}
-                className="no-print flex items-center gap-2 bg-gray-600 hover:bg-gray-700 text-white px-3 sm:px-4 py-2 rounded-lg transition-colors text-sm sm:text-base"
+                className="no-print flex items-center gap-2 px-3 py-2 bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors"
               >
-                <LogOut className="w-4 h-4 sm:w-5 sm:h-5" />
-                Sign Out
+                <LogOut className="w-4 h-4" />
+                <span className="text-sm font-medium">Sign Out</span>
               </button>
             </div>
           </div>
@@ -365,7 +377,7 @@ function HolidayTracker({ session }) {
                       type="checkbox"
                       checked={printIncludeTotals}
                       onChange={(e) => setPrintIncludeTotals(e.target.checked)}
-                      className="w-5 h-5 text-indigo-600"
+                      className="w-5 h-5 text-blue-600"
                     />
                     <span className="text-sm sm:text-base text-gray-700">Include Summary Totals</span>
                   </label>
@@ -374,7 +386,7 @@ function HolidayTracker({ session }) {
                       type="checkbox"
                       checked={printIncludeBreakdown}
                       onChange={(e) => setPrintIncludeBreakdown(e.target.checked)}
-                      className="w-5 h-5 text-indigo-600"
+                      className="w-5 h-5 text-blue-600"
                     />
                     <span className="text-sm sm:text-base text-gray-700">Include Category Breakdown</span>
                   </label>
@@ -383,7 +395,7 @@ function HolidayTracker({ session }) {
                       type="checkbox"
                       checked={printIncludeEntries}
                       onChange={(e) => setPrintIncludeEntries(e.target.checked)}
-                      className="w-5 h-5 text-indigo-600"
+                      className="w-5 h-5 text-blue-600"
                     />
                     <span className="text-sm sm:text-base text-gray-700">Include Holiday Entries</span>
                   </label>
@@ -391,7 +403,7 @@ function HolidayTracker({ session }) {
                 <div className="flex gap-3">
                   <button
                     onClick={handlePrint}
-                    className="flex-1 bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg transition-colors text-sm sm:text-base"
+                    className="flex-1 bg-gradient-to-r from-indigo-600 via-blue-600 to-cyan-600 hover:from-indigo-700 hover:via-blue-700 hover:to-cyan-700 text-white px-4 py-2 rounded-lg transition-all text-sm sm:text-base shadow-md"
                   >
                     Print
                   </button>
@@ -408,7 +420,7 @@ function HolidayTracker({ session }) {
 
           {(!showPrintOptions || printIncludeTotals) && (
             <div className="grid grid-cols-2 gap-2 sm:gap-4 mb-6 sm:mb-8">
-              <div className="bg-gradient-to-br from-blue-500 to-blue-600 rounded-lg p-3 sm:p-4 text-white">
+              <div className="bg-gradient-to-br from-indigo-500 to-blue-600 rounded-lg p-3 sm:p-4 text-white">
                 <div className="text-xs sm:text-sm opacity-90">Total Allowance</div>
                 <div className="text-2xl sm:text-3xl font-bold">{totals.totalAllowed}</div>
                 <div className="text-xs opacity-75">days</div>
@@ -423,7 +435,7 @@ function HolidayTracker({ session }) {
                 <div className="text-2xl sm:text-3xl font-bold">{totals.totalRequested}</div>
                 <div className="text-xs opacity-75">days</div>
               </div>
-              <div className="bg-gradient-to-br from-indigo-500 to-indigo-600 rounded-lg p-3 sm:p-4 text-white">
+              <div className="bg-gradient-to-br from-blue-500 to-cyan-600 rounded-lg p-3 sm:p-4 text-white">
                 <div className="text-xs sm:text-sm opacity-90">Days Remaining</div>
                 <div className="text-2xl sm:text-3xl font-bold">{totals.totalPending}</div>
                 <div className="text-xs opacity-75">days</div>
@@ -467,7 +479,7 @@ function HolidayTracker({ session }) {
                             </td>
                             <td className="text-center py-2 sm:py-3 px-2 sm:px-4 text-green-600 font-semibold">{stats.spent}</td>
                             <td className="text-center py-2 sm:py-3 px-2 sm:px-4 text-amber-600 font-semibold">{stats.requested}</td>
-                            <td className="text-center py-2 sm:py-3 px-2 sm:px-4 text-indigo-600 font-semibold">{stats.pending}</td>
+                            <td className="text-center py-2 sm:py-3 px-2 sm:px-4 text-blue-600 font-semibold">{stats.pending}</td>
                             <td className="py-2 sm:py-3 px-1 sm:px-2 flex justify-center">
                               <BatteryGauge percent={percentRemaining} />
                             </td>
@@ -513,7 +525,7 @@ function HolidayTracker({ session }) {
                     </button>
                     <button
                       onClick={() => setShowYearView(false)}
-                      className="no-print text-base sm:text-lg font-semibold text-gray-800 min-w-32 sm:min-w-48 text-center hover:text-indigo-600 transition-colors cursor-pointer"
+                      className="no-print text-base sm:text-lg font-semibold text-gray-800 min-w-32 sm:min-w-48 text-center hover:text-blue-600 transition-colors cursor-pointer"
                     >
                       {currentDate.getFullYear()}
                     </button>
@@ -538,7 +550,7 @@ function HolidayTracker({ session }) {
                     </button>
                     <button
                       onClick={() => setShowYearView(true)}
-                      className="no-print text-base sm:text-lg font-semibold text-gray-800 min-w-32 sm:min-w-48 text-center hover:text-indigo-600 transition-colors cursor-pointer"
+                      className="no-print text-base sm:text-lg font-semibold text-gray-800 min-w-32 sm:min-w-48 text-center hover:text-blue-600 transition-colors cursor-pointer"
                     >
                       {monthName}
                     </button>
@@ -587,7 +599,7 @@ function HolidayTracker({ session }) {
                           holiday
                             ? `${getCategoryColor(holiday.category)} text-white font-semibold shadow-md`
                             : isToday
-                            ? 'bg-indigo-100 border-2 border-indigo-500 text-gray-800 font-semibold'
+                            ? 'bg-blue-50 border-2 border-blue-500 text-gray-800 font-semibold'
                             : 'bg-gray-100 hover:bg-gray-200 text-gray-700'
                         }`}
                       >
@@ -613,11 +625,11 @@ function HolidayTracker({ session }) {
                         key={monthName}
                         onClick={() => selectMonth(monthIndex)}
                         className={`cursor-pointer p-2 sm:p-3 rounded-lg transition-all hover:shadow-md ${
-                          isCurrentMonth ? 'bg-indigo-50 border-2 border-indigo-400' : 'bg-gray-50 hover:bg-gray-100'
+                          isCurrentMonth ? 'bg-blue-50 border-2 border-blue-400' : 'bg-gray-50 hover:bg-gray-100'
                         }`}
                       >
                         <div className={`text-center font-semibold mb-2 text-xs sm:text-sm ${
-                          isCurrentMonth ? 'text-indigo-600' : 'text-gray-700'
+                          isCurrentMonth ? 'text-blue-600' : 'text-gray-700'
                         }`}>
                           {monthName}
                         </div>
