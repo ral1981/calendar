@@ -5,7 +5,6 @@ export default function Auth() {
   const [loading, setLoading] = useState(false);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [isSignUp, setIsSignUp] = useState(false);
   const [message, setMessage] = useState('');
 
   const handleAuth = async (e) => {
@@ -14,20 +13,11 @@ export default function Auth() {
     setMessage('');
 
     try {
-      if (isSignUp) {
-        const { data, error } = await supabase.auth.signUp({
-          email,
-          password,
-        });
-        if (error) throw error;
-        setMessage('Check your email for the confirmation link!');
-      } else {
-        const { data, error } = await supabase.auth.signInWithPassword({
-          email,
-          password,
-        });
-        if (error) throw error;
-      }
+      const { error } = await supabase.auth.signInWithPassword({
+        email,
+        password,
+      });
+      if (error) throw error;
     } catch (error) {
       setMessage(error.message);
     } finally {
@@ -42,7 +32,7 @@ export default function Auth() {
           Holiday Tracker
         </h1>
         <h2 className="text-xl font-semibold text-gray-700 mb-6 text-center">
-          {isSignUp ? 'Sign Up' : 'Sign In'}
+          Sign In
         </h2>
         
         <form onSubmit={handleAuth} className="space-y-4">
@@ -74,11 +64,7 @@ export default function Auth() {
           </div>
 
           {message && (
-            <div className={`p-3 rounded-lg text-sm ${
-              message.includes('error') || message.includes('Invalid')
-                ? 'bg-red-100 text-red-700'
-                : 'bg-green-100 text-green-700'
-            }`}>
+            <div className="p-3 rounded-lg text-sm bg-red-100 text-red-700">
               {message}
             </div>
           )}
@@ -88,18 +74,9 @@ export default function Auth() {
             disabled={loading}
             className="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-semibold py-2 px-4 rounded-lg transition-colors disabled:opacity-50"
           >
-            {loading ? 'Loading...' : isSignUp ? 'Sign Up' : 'Sign In'}
+            {loading ? 'Signing In...' : 'Sign In'}
           </button>
         </form>
-
-        <div className="mt-4 text-center">
-          <button
-            onClick={() => setIsSignUp(!isSignUp)}
-            className="text-indigo-600 hover:text-indigo-700 text-sm"
-          >
-            {isSignUp ? 'Already have an account? Sign In' : "Don't have an account? Sign Up"}
-          </button>
-        </div>
       </div>
     </div>
   );

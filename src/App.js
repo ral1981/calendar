@@ -8,13 +8,11 @@ function App() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    // Get initial session
     supabase.auth.getSession().then(({ data: { session } }) => {
       setSession(session);
       setLoading(false);
     });
 
-    // Listen for auth changes
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange((_event, session) => {
@@ -60,11 +58,23 @@ function HolidayTracker({ session }) {
   const [printIncludeBreakdown, setPrintIncludeBreakdown] = useState(false);
   const [printIncludeEntries, setPrintIncludeEntries] = useState(false);
 
-  // Load data from Supabase
   useEffect(() => {
     loadAllowances();
     loadHolidays();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  const getDefaultAllowance = (category) => {
+    const defaults = {
+      'Bank Holidays': 8,
+      'Volunteer Days': 2,
+      'Wellness Days': 3,
+      'Birthday': 1,
+      'Vacation': 20,
+      'Winter Holidays': 5
+    };
+    return defaults[category] || 0;
+  };
 
   const loadAllowances = async () => {
     try {
@@ -75,13 +85,11 @@ function HolidayTracker({ session }) {
 
       if (error) throw error;
 
-      // Convert array to object
       const allowancesObj = {};
       data.forEach(item => {
         allowancesObj[item.category] = item.total;
       });
 
-      // Set defaults for missing categories
       categories.forEach(cat => {
         if (!allowancesObj[cat]) {
           allowancesObj[cat] = getDefaultAllowance(cat);
@@ -117,32 +125,18 @@ function HolidayTracker({ session }) {
     }
   };
 
-  const getDefaultAllowance = (category) => {
-    const defaults = {
-      'Bank Holidays': 8,
-      'Volunteer Days': 2,
-      'Wellness Days': 3,
-      'Birthday': 1,
-      'Vacation': 20,
-      'Winter Holidays': 5
-    };
-    return defaults[category] || 0;
-  };
-
   const updateAllowance = async (category, value) => {
     const newValue = parseInt(value) || 0;
     setAllowances({ ...allowances, [category]: newValue });
 
     try {
-      const { error } = await supabase
+      await supabase
         .from('allowances')
         .upsert({
           user_id: session.user.id,
           category,
           total: newValue
         });
-
-      if (error) throw error;
     } catch (error) {
       console.error('Error updating allowance:', error);
     }
@@ -180,12 +174,10 @@ function HolidayTracker({ session }) {
 
   const deleteHoliday = async (id) => {
     try {
-      const { error } = await supabase
+      await supabase
         .from('holidays')
         .delete()
         .eq('id', id);
-
-      if (error) throw error;
 
       setHolidays(holidays.filter(h => h.id !== id));
     } catch (error) {
@@ -197,7 +189,6 @@ function HolidayTracker({ session }) {
     await supabase.auth.signOut();
   };
 
-  // Rest of your existing functions (getDaysInMonth, formatDate, etc.)
   const getDaysInMonth = (date) => {
     const year = date.getFullYear();
     const month = date.getMonth();
@@ -205,7 +196,6 @@ function HolidayTracker({ session }) {
     const lastDay = new Date(year, month + 1, 0);
     const daysInMonth = lastDay.getDate();
     const startingDayOfWeek = firstDay.getDay();
-    
     return { daysInMonth, startingDayOfWeek, year, month };
   };
 
@@ -222,7 +212,6 @@ function HolidayTracker({ session }) {
     const today = new Date();
     today.setHours(0, 0, 0, 0);
     selectedDate.setHours(0, 0, 0, 0);
-    
     return selectedDate < today ? 'spent' : 'requested';
   };
 
@@ -238,31 +227,17 @@ function HolidayTracker({ session }) {
     if (existing) {
       deleteHoliday(existing.id);
     } else {
-      if (!canAddHoliday(selectedCategory)) {
-        return;
-      }
-      
+      if (!canAddHoliday(selectedCategory)) return;
       const status = determineStatus(year, month, day);
       addHoliday(year, month, day, selectedCategory, status);
     }
   };
 
-  const previousMonth = () => {
-    setCurrentDate(new Date(currentDate.getFullYear(), currentDate.getMonth() - 1, 1));
-  };
-
-  const nextMonth = () => {
-    setCurrentDate(new Date(currentDate.getFullYear(), currentDate.getMonth() + 1, 1));
-  };
-
-  const previousYear = () => {
-    setCurrentDate(new Date(currentDate.getFullYear() - 1, currentDate.getMonth(), 1));
-  };
-
-  const nextYear = () => {
-    setCurrentDate(new Date(currentDate.getFullYear() + 1, currentDate.getMonth(), 1));
-  };
-
+  const previousMonth = () => setCurrentDate(new Date(currentDate.getFullYear(), currentDate.getMonth() - 1, 1));
+  const nextMonth = () => setCurrentDate(new Date(currentDate.getFullYear(), currentDate.getMonth() + 1, 1));
+  const previousYear = () => setCurrentDate(new Date(currentDate.getFullYear() - 1, currentDate.getMonth(), 1));
+  const nextYear = () => setCurrentDate(new Date(currentDate.getFullYear() + 1, currentDate.getMonth(), 1));
+  
   const selectMonth = (monthIndex) => {
     setCurrentDate(new Date(currentDate.getFullYear(), monthIndex, 1));
     setShowYearView(false);
@@ -270,40 +245,27 @@ function HolidayTracker({ session }) {
 
   const handlePrint = () => {
     setShowPrintOptions(false);
-    setTimeout(() => {
-      window.print();
-    }, 100);
+    setTimeout(() => window.print(), 100);
   };
 
   const calculateStats = (category) => {
     const categoryHolidays = holidays.filter(h => h.category === category);
-    const spent = categoryHolidays
-      .filter(h => h.status === 'spent')
-      .reduce((sum, h) => sum + h.days, 0);
-    const requested = categoryHolidays
-      .filter(h => h.status === 'requested')
-      .reduce((sum, h) => sum + h.days, 0);
+    const spent = categoryHolidays.filter(h => h.status === 'spent').reduce((sum, h) => sum + h.days, 0);
+    const requested = categoryHolidays.filter(h => h.status === 'requested').reduce((sum, h) => sum + h.days, 0);
     const total = allowances[category] || 0;
     const pending = total - spent - requested;
-    
     return { total, spent, requested, pending };
   };
 
   const calculateTotals = () => {
-    let totalAllowed = 0;
-    let totalSpent = 0;
-    let totalRequested = 0;
-    
+    let totalAllowed = 0, totalSpent = 0, totalRequested = 0;
     categories.forEach(cat => {
       const stats = calculateStats(cat);
       totalAllowed += stats.total;
       totalSpent += stats.spent;
       totalRequested += stats.requested;
     });
-    
-    const totalPending = totalAllowed - totalSpent - totalRequested;
-    
-    return { totalAllowed, totalSpent, totalRequested, totalPending };
+    return { totalAllowed, totalSpent, totalRequested, totalPending: totalAllowed - totalSpent - totalRequested };
   };
 
   const getCategoryColor = (category) => {
@@ -324,14 +286,8 @@ function HolidayTracker({ session }) {
       if (percent >= 25) return 'from-amber-500 to-amber-600';
       return 'from-red-500 to-red-600';
     };
-    
-    const getBorderColor = () => {
-      return percent === 0 ? 'border-red-500' : 'border-gray-400';
-    };
-    
-    const getTerminalColor = () => {
-      return percent === 0 ? 'bg-red-500' : 'bg-gray-400';
-    };
+    const getBorderColor = () => percent === 0 ? 'border-red-500' : 'border-gray-400';
+    const getTerminalColor = () => percent === 0 ? 'bg-red-500' : 'bg-gray-400';
     
     return (
       <div className={`relative w-16 h-8 border-2 ${getBorderColor()} rounded-md flex items-center transition-colors duration-300`}>
@@ -358,10 +314,8 @@ function HolidayTracker({ session }) {
   const { daysInMonth, startingDayOfWeek, year, month } = getDaysInMonth(currentDate);
   const monthName = currentDate.toLocaleString('default', { month: 'long', year: 'numeric' });
   const daysOfWeek = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
-  const monthNames = ['January', 'February', 'March', 'April', 'May', 'June', 
-                      'July', 'August', 'September', 'October', 'November', 'December'];
+  const monthNames = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
 
-  // Flattened layout: single outer frame containing all content
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 p-2 sm:p-6">
       <style>{`
@@ -371,12 +325,11 @@ function HolidayTracker({ session }) {
           .print-only { display: block !important; }
           .bg-gradient-to-br { background: white !important; }
           .shadow-lg { box-shadow: none !important; }
-          .hover\\:scale-105:hover { transform: none !important; }
           button { pointer-events: none; }
         }
         .print-only { display: none; }
       `}</style>
-
+      
       <div className="max-w-6xl mx-auto">
         <div className="bg-white rounded-lg shadow-lg p-4 sm:p-8 mb-6">
           <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between mb-6 gap-3">
@@ -756,6 +709,6 @@ function HolidayTracker({ session }) {
       </div>
     </div>
   );
-};
+}
 
-export default HolidayTracker;
+export default App;
