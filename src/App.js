@@ -136,6 +136,8 @@ function HolidayTracker({ session }) {
           user_id: session.user.id,
           category,
           total: newValue
+        }, {
+          onConflict: 'user_id,category'
         });
     } catch (error) {
       console.error('Error updating allowance:', error);
