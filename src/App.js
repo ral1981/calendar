@@ -272,12 +272,12 @@ function HolidayTracker({ session }) {
 
   const getCategoryColor = (category) => {
     const colors = {
-      'Bank Holidays': 'bg-indigo-500',
-      'Volunteer Days': 'bg-teal-500',
-      'Wellness Days': 'bg-blue-500',
+      'Bank Holidays': 'bg-rose-500',
       'Birthday': 'bg-violet-500',
-      'Vacation': 'bg-cyan-500',
-      'Winter Holidays': 'bg-sky-500'
+      'Vacation': 'bg-blue-500',
+      'Volunteer Days': 'bg-emerald-500',
+      'Wellness Days': 'bg-amber-500',
+      'Winter Holidays': 'bg-cyan-500'
     };
     return colors[category] || 'bg-gray-500';
   };
