@@ -54,6 +54,7 @@ function HolidayTracker({ session }) {
   const [selectedCategory, setSelectedCategory] = useState('Bank Holidays');
   const [showYearView, setShowYearView] = useState(false);
   const [showPrintOptions, setShowPrintOptions] = useState(false);
+  const [isPrinting, setIsPrinting] = useState(false);
   const [printIncludeTotals, setPrintIncludeTotals] = useState(false);
   const [printIncludeBreakdown, setPrintIncludeBreakdown] = useState(false);
   const [printIncludeEntries, setPrintIncludeEntries] = useState(false);
@@ -247,7 +248,12 @@ function HolidayTracker({ session }) {
 
   const handlePrint = () => {
     setShowPrintOptions(false);
-    setTimeout(() => window.print(), 100);
+    setIsPrinting(true);
+    setTimeout(() => {
+      window.print();
+      // Reset isPrinting after print dialog closes
+      setTimeout(() => setIsPrinting(false), 100);
+    }, 100);
   };
 
   const calculateStats = (category) => {
@@ -322,12 +328,81 @@ function HolidayTracker({ session }) {
     <div className="min-h-screen bg-gradient-to-br from-indigo-50 via-blue-50 to-cyan-50 p-2 sm:p-6">
       <style>{`
         @media print {
-          body { background: white !important; }
+          /* Enable background colors for printing */
+          body { 
+            background: white !important;
+            -webkit-print-color-adjust: exact !important;
+            print-color-adjust: exact !important;
+            color-adjust: exact !important;
+          }
+          * {
+            -webkit-print-color-adjust: exact !important;
+            print-color-adjust: exact !important;
+            color-adjust: exact !important;
+          }
+          
+          /* Basic print styles */
           .no-print { display: none !important; }
           .print-only { display: block !important; }
           .bg-gradient-to-br { background: white !important; }
           .shadow-lg { box-shadow: none !important; }
           button { pointer-events: none; }
+          
+          /* CRITICAL: Prevent page breaks within calendar section */
+          .calendar-section {
+            page-break-inside: avoid !important;
+            break-inside: avoid !important;
+            page-break-before: auto !important;
+            break-before: auto !important;
+            display: block !important;
+          }
+          
+          /* Ensure calendar background container doesn't break */
+          .calendar-section .bg-gray-50 {
+            page-break-inside: avoid !important;
+            break-inside: avoid !important;
+          }
+          
+          /* Scale down calendar to fit A4 page */
+          .calendar-section {
+            transform: scale(0.85);
+            transform-origin: top center;
+            margin-bottom: -2rem !important;
+          }
+          
+          /* Year view: make more compact */
+          .calendar-section .grid.grid-cols-2,
+          .calendar-section .grid.grid-cols-3 {
+            gap: 0.25rem !important;
+            padding: 0.5rem !important;
+          }
+          
+          /* Month view: ensure single page */
+          .calendar-section .grid.grid-cols-7 {
+            font-size: 0.875rem !important;
+          }
+          
+          /* Reduce padding in calendar section for print */
+          .calendar-section .bg-gray-50 {
+            padding: 0.75rem !important;
+          }
+          
+          /* Category breakdown: prevent orphaning */
+          .bg-white.rounded-lg {
+            page-break-inside: avoid !important;
+            break-inside: avoid !important;
+          }
+          
+          /* Allow page break before calendar if needed */
+          .calendar-section {
+            page-break-before: auto !important;
+          }
+          
+          /* Ensure total allowance cards don't break */
+          .grid.grid-cols-2.gap-2 {
+            page-break-inside: avoid !important;
+            break-inside: avoid !important;
+          }
         }
         .print-only { display: none; }
       `}</style>
@@ -420,7 +495,7 @@ function HolidayTracker({ session }) {
             </div>
           )}
 
-          {(!showPrintOptions || printIncludeTotals) && (
+          {(!isPrinting || printIncludeTotals) && (
             <div className="grid grid-cols-2 gap-2 sm:gap-4 mb-6 sm:mb-8">
               <div className="bg-gradient-to-br from-indigo-500 to-blue-600 rounded-lg p-3 sm:p-4 text-white">
                 <div className="text-xs sm:text-sm opacity-90">Total Allowance</div>
@@ -445,8 +520,8 @@ function HolidayTracker({ session }) {
             </div>
           )}
 
-          {(!showPrintOptions || printIncludeBreakdown) && (
-            <>
+          {(!isPrinting || printIncludeBreakdown) && (
+            <div className="category-breakdown">
               <h2 className="text-lg sm:text-xl font-semibold text-gray-800 mb-4">Category Breakdown</h2>
               <div className="overflow-x-auto mb-6 sm:mb-8 -mx-4 sm:mx-0">
                 <div className="inline-block min-w-full align-middle px-4 sm:px-0">
@@ -492,11 +567,12 @@ function HolidayTracker({ session }) {
                   </table>
                 </div>
               </div>
-            </>
+            </div>
           )}
 
-          <h2 className="text-lg sm:text-xl font-semibold text-gray-800 mb-4">Add Holidays</h2>
-          <div className="bg-gray-50 rounded-lg p-3 sm:p-6 mb-6">
+          <div className="calendar-section">
+            <h2 className="text-lg sm:text-xl font-semibold text-gray-800 mb-4">Add Holidays</h2>
+            <div className="bg-gray-50 rounded-lg p-3 sm:p-6 mb-6">
             <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between mb-4 gap-3">
               <div className="w-full sm:w-auto no-print">
                 <label className="block text-sm font-medium text-gray-700 mb-1">Category</label>
@@ -571,7 +647,7 @@ function HolidayTracker({ session }) {
             </div>
 
             {!showYearView && (
-              <div className="bg-white rounded-lg p-2 sm:p-4">
+              <div className="month-calendar bg-white rounded-lg p-2 sm:p-4">
                 <div className="grid grid-cols-7 gap-1 sm:gap-2 mb-2">
                   {daysOfWeek.map(day => (
                     <div key={day} className="text-center font-semibold text-gray-600 text-xs sm:text-sm py-1 sm:py-2">
@@ -615,24 +691,19 @@ function HolidayTracker({ session }) {
 
             {showYearView && (
               <div className="bg-white rounded-lg p-2 sm:p-4">
-                <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 sm:gap-4">
+                <div className="year-view-grid grid grid-cols-2 sm:grid-cols-3 gap-2 sm:gap-4">
                   {monthNames.map((monthName, monthIndex) => {
                     const monthDate = new Date(currentDate.getFullYear(), monthIndex, 1);
                     const monthInfo = getDaysInMonth(monthDate);
                     const monthYear = monthDate.getFullYear();
-                    const isCurrentMonth = monthIndex === month && monthYear === year;
                     
                     return (
                       <div 
                         key={monthName}
                         onClick={() => selectMonth(monthIndex)}
-                        className={`cursor-pointer p-2 sm:p-3 rounded-lg transition-all hover:shadow-md ${
-                          isCurrentMonth ? 'bg-blue-50 border-2 border-blue-400' : 'bg-gray-50 hover:bg-gray-100'
-                        }`}
+                        className={`cursor-pointer p-2 sm:p-3 rounded-lg transition-all hover:shadow-md bg-gray-50 hover:bg-gray-100`}
                       >
-                        <div className={`text-center font-semibold mb-2 text-xs sm:text-sm ${
-                          isCurrentMonth ? 'text-blue-600' : 'text-gray-700'
-                        }`}>
+                        <div className={`text-center font-semibold mb-2 text-xs sm:text-sm text-gray-700`}>
                           {monthName}
                         </div>
                         <div className="grid grid-cols-7 gap-0.5 sm:gap-1">
@@ -677,8 +748,9 @@ function HolidayTracker({ session }) {
               Click on a day to add/remove a holiday.
             </div>
           </div>
+          </div>
 
-          {(!showPrintOptions || printIncludeEntries) && (
+          {(!isPrinting || printIncludeEntries) && (
             <div>
               <h2 className="text-lg sm:text-xl font-semibold text-gray-800 mb-4">Holiday Entries</h2>
               <div className="space-y-2">
