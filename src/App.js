@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from './supabaseClient';
 import Auth from './Auth';
-import { ChevronLeft, ChevronRight, Trash2, Printer, LogOut, CalendarSearch } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Trash2, Printer, LogOut, CalendarSearch, ArrowUp } from 'lucide-react';
 
 function App() {
   const [session, setSession] = useState(null);
@@ -58,11 +58,22 @@ function HolidayTracker({ session }) {
   const [printIncludeTotals, setPrintIncludeTotals] = useState(false);
   const [printIncludeBreakdown, setPrintIncludeBreakdown] = useState(false);
   const [printIncludeEntries, setPrintIncludeEntries] = useState(false);
+  const [showBackToTop, setShowBackToTop] = useState(false);
 
   useEffect(() => {
     loadAllowances();
     loadHolidays();
     // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  useEffect(() => {
+    const handleScroll = () => {
+      // Show button after scrolling down 300px
+      setShowBackToTop(window.scrollY > 300);
+    };
+
+    window.addEventListener('scroll', handleScroll);
+    return () => window.removeEventListener('scroll', handleScroll);
   }, []);
 
   const getDefaultAllowance = (category) => {
@@ -75,6 +86,13 @@ function HolidayTracker({ session }) {
       'Winter Holidays': 5
     };
     return defaults[category] || 0;
+  };
+
+  const scrollToTop = () => {
+    window.scrollTo({
+      top: 0,
+      behavior: 'smooth'
+    });
   };
 
   const loadAllowances = async () => {
@@ -407,6 +425,31 @@ function HolidayTracker({ session }) {
         .print-only { display: none; }
       `}</style>
       
+      {/* Floating Action Buttons - Print and Logout */}
+      <div className="no-print fixed top-4 right-4 z-50 flex flex-col gap-3">
+        <button
+          onClick={() => {
+            setShowPrintOptions(!showPrintOptions);
+            if (showPrintOptions) {
+              setPrintIncludeTotals(false);
+              setPrintIncludeBreakdown(false);
+              setPrintIncludeEntries(false);
+            }
+          }}
+          className="bg-white hover:bg-gray-50 p-3 rounded-full shadow-lg hover:shadow-xl transition-all duration-200 border border-gray-200 group"
+          title="Print options"
+        >
+          <Printer className="w-5 h-5 text-gray-700 group-hover:text-blue-600 transition-colors" />
+        </button>
+        <button
+          onClick={handleSignOut}
+          className="bg-white hover:bg-red-50 p-3 rounded-full shadow-lg hover:shadow-xl transition-all duration-200 border border-gray-200 group"
+          title="Sign Out"
+        >
+          <LogOut className="w-5 h-5 text-gray-700 group-hover:text-red-600 transition-colors" />
+        </button>
+      </div>
+      
       <div className="max-w-6xl mx-auto">
         <div className="bg-white rounded-lg shadow-lg p-4 sm:p-6 mb-6">
           <div className="flex flex-col sm:flex-row items-center justify-between gap-4 mb-6">
@@ -419,30 +462,17 @@ function HolidayTracker({ session }) {
               </div>
               <h1 className="text-xl font-bold text-gray-800">Holiday Tracker</h1>
             </div>
-            <div className="flex items-center gap-2">
-              <button
-                onClick={() => {
-                  setShowPrintOptions(!showPrintOptions);
-                  if (showPrintOptions) {
-                    setPrintIncludeTotals(false);
-                    setPrintIncludeBreakdown(false);
-                    setPrintIncludeEntries(false);
-                  }
-                }}
-                className="no-print p-2 hover:bg-gray-100 rounded-lg transition-colors"
-                title="Print options"
-              >
-                <Printer className="w-5 h-5 text-gray-600" />
-              </button>
-              <button
-                onClick={handleSignOut}
-                className="no-print flex items-center gap-2 px-3 py-2 bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors"
-              >
-                <LogOut className="w-4 h-4" />
-                <span className="text-sm font-medium">Sign Out</span>
-              </button>
-            </div>
           </div>
+
+          {showBackToTop && (
+            <button
+              onClick={scrollToTop}
+              className="no-print fixed bottom-4 right-4 bg-white text-gray-700 p-3 rounded-full shadow-lg hover:bg-gray-100 transition-all hover:scale-110 z-50"
+              title="Back to top"
+            >
+              <ArrowUp className="w-5 h-5 sm:w-6 sm:h-6" />
+            </button>
+          )}
 
           {showPrintOptions && (
             <div className="no-print fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
