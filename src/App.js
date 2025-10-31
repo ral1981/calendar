@@ -57,6 +57,7 @@ function HolidayTracker({ session }) {
   const [isPrinting, setIsPrinting] = useState(false);
   const [printIncludeTotals, setPrintIncludeTotals] = useState(false);
   const [printIncludeBreakdown, setPrintIncludeBreakdown] = useState(false);
+  const [printIncludeCalendar, setPrintIncludeCalendar] = useState(true);
   const [printIncludeEntries, setPrintIncludeEntries] = useState(false);
   const [showBackToTop, setShowBackToTop] = useState(false);
 
@@ -433,6 +434,7 @@ function HolidayTracker({ session }) {
             if (showPrintOptions) {
               setPrintIncludeTotals(false);
               setPrintIncludeBreakdown(false);
+              setPrintIncludeCalendar(true);
               setPrintIncludeEntries(false);
             }
           }}
@@ -496,6 +498,15 @@ function HolidayTracker({ session }) {
                       className="w-5 h-5 text-blue-600"
                     />
                     <span className="text-sm sm:text-base text-gray-700">Include Category Breakdown</span>
+                  </label>
+                  <label className="flex items-center gap-3 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={printIncludeCalendar}
+                      onChange={(e) => setPrintIncludeCalendar(e.target.checked)}
+                      className="w-5 h-5 text-blue-600"
+                    />
+                    <span className="text-sm sm:text-base text-gray-700">Include Calendar</span>
                   </label>
                   <label className="flex items-center gap-3 cursor-pointer">
                     <input
@@ -600,185 +611,187 @@ function HolidayTracker({ session }) {
             </div>
           )}
 
-          <div className="calendar-section">
-            <h2 className="text-lg sm:text-xl font-semibold text-gray-800 mb-4">Add Holidays</h2>
-            <div className="bg-gray-50 rounded-lg p-3 sm:p-6 mb-6">
-            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between mb-4 gap-3">
-              <div className="w-full sm:w-auto no-print">
-                <label className="block text-sm font-medium text-gray-700 mb-1">Category</label>
-                <select
-                  value={selectedCategory}
-                  onChange={(e) => setSelectedCategory(e.target.value)}
-                  className="w-full sm:w-auto border border-gray-300 rounded px-3 py-2 text-sm"
-                >
-                  {categories.map(cat => {
-                    const stats = calculateStats(cat);
-                    const isDisabled = stats.pending <= 0;
-                    return (
-                      <option key={cat} value={cat} disabled={isDisabled}>
-                        {cat} {isDisabled ? '(No days remaining)' : `(${stats.pending} remaining)`}
-                      </option>
-                    );
-                  })}
-                </select>
-              </div>
-              <div className="flex items-center gap-2 w-full sm:w-auto justify-center">
-                {showYearView && (
-                  <>
-                    <button
-                      onClick={previousYear}
-                      className="no-print p-2 hover:bg-gray-200 rounded transition-colors"
+          {(!isPrinting || printIncludeCalendar) && (
+            <div className="calendar-section">
+              <h2 className="text-lg sm:text-xl font-semibold text-gray-800 mb-4">Calendar</h2>
+              <div className="bg-gray-50 rounded-lg p-3 sm:p-6 mb-6">
+                <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between mb-4 gap-3">
+                  <div className="w-full sm:w-auto no-print">
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Category</label>
+                    <select
+                      value={selectedCategory}
+                      onChange={(e) => setSelectedCategory(e.target.value)}
+                      className="w-full sm:w-auto border border-gray-300 rounded px-3 py-2 text-sm"
                     >
-                      <ChevronLeft className="w-5 h-5" />
-                    </button>
-                    <button
-                      onClick={() => setShowYearView(false)}
-                      className="no-print text-base sm:text-lg font-semibold text-gray-800 min-w-32 sm:min-w-48 text-center hover:text-blue-600 transition-colors cursor-pointer"
-                    >
-                      {currentDate.getFullYear()}
-                    </button>
-                    <span className="print-only text-lg font-semibold text-gray-800 min-w-48 text-center">
-                      {currentDate.getFullYear()}
-                    </span>
-                    <button
-                      onClick={nextYear}
-                      className="no-print p-2 hover:bg-gray-200 rounded transition-colors"
-                    >
-                      <ChevronRight className="w-5 h-5" />
-                    </button>
-                  </>
-                )}
-                {!showYearView && (
-                  <>
-                    <button
-                      onClick={previousMonth}
-                      className="no-print p-2 hover:bg-gray-200 rounded transition-colors"
-                    >
-                      <ChevronLeft className="w-5 h-5" />
-                    </button>
-                    <button
-                      onClick={() => setShowYearView(true)}
-                      className="no-print text-base sm:text-lg font-semibold text-gray-800 min-w-32 sm:min-w-48 text-center hover:text-blue-600 transition-colors cursor-pointer"
-                    >
-                      {monthName}
-                    </button>
-                    <span className="print-only text-lg font-semibold text-gray-800 min-w-48 text-center">
-                      {monthName}
-                    </span>
-                    <button
-                      onClick={nextMonth}
-                      className="no-print p-2 hover:bg-gray-200 rounded transition-colors"
-                    >
-                      <ChevronRight className="w-5 h-5" />
-                    </button>
-                  </>
-                )}
-              </div>
-            </div>
+                      {categories.map(cat => {
+                        const stats = calculateStats(cat);
+                        const isDisabled = stats.pending <= 0;
+                        return (
+                          <option key={cat} value={cat} disabled={isDisabled}>
+                            {cat} {isDisabled ? '(No days remaining)' : `(${stats.pending} remaining)`}
+                          </option>
+                        );
+                      })}
+                    </select>
+                  </div>
+                  <div className="flex items-center gap-2 w-full sm:w-auto justify-center">
+                    {showYearView && (
+                      <>
+                        <button
+                          onClick={previousYear}
+                          className="no-print p-2 hover:bg-gray-200 rounded transition-colors"
+                        >
+                          <ChevronLeft className="w-5 h-5" />
+                        </button>
+                        <button
+                          onClick={() => setShowYearView(false)}
+                          className="no-print text-base sm:text-lg font-semibold text-gray-800 min-w-32 sm:min-w-48 text-center hover:text-blue-600 transition-colors cursor-pointer"
+                        >
+                          {currentDate.getFullYear()}
+                        </button>
+                        <span className="print-only text-lg font-semibold text-gray-800 min-w-48 text-center">
+                          {currentDate.getFullYear()}
+                        </span>
+                        <button
+                          onClick={nextYear}
+                          className="no-print p-2 hover:bg-gray-200 rounded transition-colors"
+                        >
+                          <ChevronRight className="w-5 h-5" />
+                        </button>
+                      </>
+                    )}
+                    {!showYearView && (
+                      <>
+                        <button
+                          onClick={previousMonth}
+                          className="no-print p-2 hover:bg-gray-200 rounded transition-colors"
+                        >
+                          <ChevronLeft className="w-5 h-5" />
+                        </button>
+                        <button
+                          onClick={() => setShowYearView(true)}
+                          className="no-print text-base sm:text-lg font-semibold text-gray-800 min-w-32 sm:min-w-48 text-center hover:text-blue-600 transition-colors cursor-pointer"
+                        >
+                          {monthName}
+                        </button>
+                        <span className="print-only text-lg font-semibold text-gray-800 min-w-48 text-center">
+                          {monthName}
+                        </span>
+                        <button
+                          onClick={nextMonth}
+                          className="no-print p-2 hover:bg-gray-200 rounded transition-colors"
+                        >
+                          <ChevronRight className="w-5 h-5" />
+                        </button>
+                      </>
+                    )}
+                  </div>
+                </div>
 
-            {!showYearView && (
-              <div className="month-calendar bg-white rounded-lg p-2 sm:p-4">
-                <div className="grid grid-cols-7 gap-1 sm:gap-2 mb-2">
-                  {daysOfWeek.map(day => (
-                    <div key={day} className="text-center font-semibold text-gray-600 text-xs sm:text-sm py-1 sm:py-2">
-                      {day}
+                {!showYearView && (
+                  <div className="month-calendar bg-white rounded-lg p-2 sm:p-4">
+                    <div className="grid grid-cols-7 gap-1 sm:gap-2 mb-2">
+                      {daysOfWeek.map(day => (
+                        <div key={day} className="text-center font-semibold text-gray-600 text-xs sm:text-sm py-1 sm:py-2">
+                          {day}
+                        </div>
+                      ))}
+                    </div>
+                    <div className="grid grid-cols-7 gap-1 sm:gap-2">
+                      {[...Array(startingDayOfWeek)].map((_, i) => (
+                        <div key={`empty-${i}`} className="aspect-square"></div>
+                      ))}
+                      {[...Array(daysInMonth)].map((_, i) => {
+                        const day = i + 1;
+                        const dateStr = formatDate(year, month, day);
+                        const holiday = getHolidayForDate(dateStr);
+                        const isToday = new Date().toDateString() === new Date(year, month, day).toDateString();
+                        const canAdd = !holiday && canAddHoliday(selectedCategory);
+                        
+                        return (
+                          <button
+                            key={day}
+                            onClick={() => toggleHoliday(year, month, day)}
+                            disabled={!holiday && !canAdd}
+                            className={`aspect-square rounded-lg flex flex-col items-center justify-center text-xs sm:text-sm transition-all ${
+                              canAdd || holiday ? 'hover:scale-105 cursor-pointer' : 'cursor-not-allowed opacity-50'
+                            } ${
+                              holiday
+                                ? `${getCategoryColor(holiday.category)} text-white font-semibold shadow-md`
+                                : isToday
+                                ? 'bg-blue-50 border-2 border-blue-500 text-gray-800 font-semibold'
+                                : 'bg-gray-100 hover:bg-gray-200 text-gray-700'
+                            }`}
+                          >
+                            <span>{day}</span>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
+
+                {showYearView && (
+                  <div className="bg-white rounded-lg p-2 sm:p-4">
+                    <div className="year-view-grid grid grid-cols-2 sm:grid-cols-3 gap-2 sm:gap-4">
+                      {monthNames.map((monthName, monthIndex) => {
+                        const monthDate = new Date(currentDate.getFullYear(), monthIndex, 1);
+                        const monthInfo = getDaysInMonth(monthDate);
+                        const monthYear = monthDate.getFullYear();
+                        
+                        return (
+                          <div 
+                            key={monthName}
+                            onClick={() => selectMonth(monthIndex)}
+                            className={`cursor-pointer p-2 sm:p-3 rounded-lg transition-all hover:shadow-md bg-gray-50 hover:bg-gray-100`}
+                          >
+                            <div className={`text-center font-semibold mb-2 text-xs sm:text-sm text-gray-700`}>
+                              {monthName}
+                            </div>
+                            <div className="grid grid-cols-7 gap-0.5 sm:gap-1">
+                              {[...Array(monthInfo.startingDayOfWeek)].map((_, i) => (
+                                <div key={`empty-${i}`} className="aspect-square"></div>
+                              ))}
+                              {[...Array(monthInfo.daysInMonth)].map((_, i) => {
+                                const day = i + 1;
+                                const dateStr = formatDate(monthYear, monthIndex, day);
+                                const holiday = getHolidayForDate(dateStr);
+                                
+                                return (
+                                  <div
+                                    key={day}
+                                    className={`aspect-square rounded flex items-center justify-center text-xs ${
+                                      holiday
+                                        ? `${getCategoryColor(holiday.category)} text-white`
+                                        : 'text-gray-400'
+                                    }`}
+                                  >
+                                    {day}
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
+
+                <div className="mt-4 flex flex-wrap gap-2 sm:gap-3">
+                  {categories.map(cat => (
+                    <div key={cat} className="flex items-center gap-2">
+                      <div className={`w-3 h-3 sm:w-4 sm:h-4 rounded ${getCategoryColor(cat)}`}></div>
+                      <span className="text-xs sm:text-sm text-gray-700">{cat}</span>
                     </div>
                   ))}
                 </div>
-                <div className="grid grid-cols-7 gap-1 sm:gap-2">
-                  {[...Array(startingDayOfWeek)].map((_, i) => (
-                    <div key={`empty-${i}`} className="aspect-square"></div>
-                  ))}
-                  {[...Array(daysInMonth)].map((_, i) => {
-                    const day = i + 1;
-                    const dateStr = formatDate(year, month, day);
-                    const holiday = getHolidayForDate(dateStr);
-                    const isToday = new Date().toDateString() === new Date(year, month, day).toDateString();
-                    const canAdd = !holiday && canAddHoliday(selectedCategory);
-                    
-                    return (
-                      <button
-                        key={day}
-                        onClick={() => toggleHoliday(year, month, day)}
-                        disabled={!holiday && !canAdd}
-                        className={`aspect-square rounded-lg flex flex-col items-center justify-center text-xs sm:text-sm transition-all ${
-                          canAdd || holiday ? 'hover:scale-105 cursor-pointer' : 'cursor-not-allowed opacity-50'
-                        } ${
-                          holiday
-                            ? `${getCategoryColor(holiday.category)} text-white font-semibold shadow-md`
-                            : isToday
-                            ? 'bg-blue-50 border-2 border-blue-500 text-gray-800 font-semibold'
-                            : 'bg-gray-100 hover:bg-gray-200 text-gray-700'
-                        }`}
-                      >
-                        <span>{day}</span>
-                      </button>
-                    );
-                  })}
+                <div className="mt-2 text-xs sm:text-sm text-gray-600">
+                  Click on a day to add/remove a holiday.
                 </div>
               </div>
-            )}
-
-            {showYearView && (
-              <div className="bg-white rounded-lg p-2 sm:p-4">
-                <div className="year-view-grid grid grid-cols-2 sm:grid-cols-3 gap-2 sm:gap-4">
-                  {monthNames.map((monthName, monthIndex) => {
-                    const monthDate = new Date(currentDate.getFullYear(), monthIndex, 1);
-                    const monthInfo = getDaysInMonth(monthDate);
-                    const monthYear = monthDate.getFullYear();
-                    
-                    return (
-                      <div 
-                        key={monthName}
-                        onClick={() => selectMonth(monthIndex)}
-                        className={`cursor-pointer p-2 sm:p-3 rounded-lg transition-all hover:shadow-md bg-gray-50 hover:bg-gray-100`}
-                      >
-                        <div className={`text-center font-semibold mb-2 text-xs sm:text-sm text-gray-700`}>
-                          {monthName}
-                        </div>
-                        <div className="grid grid-cols-7 gap-0.5 sm:gap-1">
-                          {[...Array(monthInfo.startingDayOfWeek)].map((_, i) => (
-                            <div key={`empty-${i}`} className="aspect-square"></div>
-                          ))}
-                          {[...Array(monthInfo.daysInMonth)].map((_, i) => {
-                            const day = i + 1;
-                            const dateStr = formatDate(monthYear, monthIndex, day);
-                            const holiday = getHolidayForDate(dateStr);
-                            
-                            return (
-                              <div
-                                key={day}
-                                className={`aspect-square rounded flex items-center justify-center text-xs ${
-                                  holiday
-                                    ? `${getCategoryColor(holiday.category)} text-white`
-                                    : 'text-gray-400'
-                                }`}
-                              >
-                                {day}
-                              </div>
-                            );
-                          })}
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
-            )}
-
-            <div className="mt-4 flex flex-wrap gap-2 sm:gap-3">
-              {categories.map(cat => (
-                <div key={cat} className="flex items-center gap-2">
-                  <div className={`w-3 h-3 sm:w-4 sm:h-4 rounded ${getCategoryColor(cat)}`}></div>
-                  <span className="text-xs sm:text-sm text-gray-700">{cat}</span>
-                </div>
-              ))}
             </div>
-            <div className="mt-2 text-xs sm:text-sm text-gray-600">
-              Click on a day to add/remove a holiday.
-            </div>
-          </div>
-          </div>
+          )}
 
           {(!isPrinting || printIncludeEntries) && (
             <div>
