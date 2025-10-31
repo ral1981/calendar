@@ -70,10 +70,17 @@ function HolidayTracker({ session }) {
 
   useEffect(() => {
     loadCategories();
-    loadAllowances();
     loadHolidays();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // Load allowances when categories are loaded or when year changes
+  useEffect(() => {
+    if (categories.length > 0) {
+      loadAllowances();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [categories, currentDate.getFullYear()]);
 
   useEffect(() => {
     const handleScroll = () => {
@@ -148,16 +155,28 @@ function HolidayTracker({ session }) {
 
   const loadAllowances = async () => {
     try {
+      const currentYear = currentDate.getFullYear();
+      
       const { data, error } = await supabase
         .from('allowances')
         .select('*')
-        .eq('user_id', session.user.id);
+        .eq('user_id', session.user.id)
+        .eq('year', currentYear);
 
       if (error) throw error;
 
       const allowancesObj = {};
+      
+      // First, populate with data from database
       data.forEach(item => {
         allowancesObj[item.category] = item.total;
+      });
+
+      // Then, for categories without allowances, use default_allowance
+      categories.forEach(cat => {
+        if (allowancesObj[cat.name] === undefined) {
+          allowancesObj[cat.name] = cat.default_allowance;
+        }
       });
 
       setAllowances(allowancesObj);
@@ -194,14 +213,17 @@ function HolidayTracker({ session }) {
     setAllowances({ ...allowances, [category]: newValue });
 
     try {
+      const currentYear = currentDate.getFullYear();
+      
       await supabase
         .from('allowances')
         .upsert({
           user_id: session.user.id,
           category,
-          total: newValue
+          total: newValue,
+          year: currentYear
         }, {
-          onConflict: 'user_id,category'
+          onConflict: 'user_id,category,year'
         });
     } catch (error) {
       console.error('Error updating allowance:', error);
@@ -319,7 +341,15 @@ function HolidayTracker({ session }) {
   };
 
   const calculateStats = (category) => {
-    const categoryHolidays = holidays.filter(h => h.category === category);
+    const currentYear = currentDate.getFullYear();
+    
+    // Filter holidays to only include those from the current year
+    const categoryHolidays = holidays.filter(h => {
+      if (h.category !== category) return false;
+      const holidayYear = new Date(h.date).getFullYear();
+      return holidayYear === currentYear;
+    });
+    
     const spent = categoryHolidays.filter(h => h.status === 'spent').reduce((sum, h) => sum + h.days, 0);
     const requested = categoryHolidays.filter(h => h.status === 'requested').reduce((sum, h) => sum + h.days, 0);
     const cat = categories.find(c => c.name === category);
@@ -367,6 +397,9 @@ function HolidayTracker({ session }) {
       if (error) throw error;
 
       setCategories([...categories, data]);
+      
+      // Initialize allowance for current year
+      const currentYear = currentDate.getFullYear();
       await updateAllowance(newCategoryName.trim(), newCategoryAllowance);
       
       setNewCategoryName('');
@@ -439,7 +472,7 @@ function HolidayTracker({ session }) {
 
       setCategories(categories.map(c => c.id === editingCategoryId ? data : c));
       
-      // Update allowance with new value
+      // Update allowance with new value for current year
       await updateAllowance(newCategoryName.trim(), newCategoryAllowance);
       
       cancelEdit();
@@ -470,7 +503,7 @@ function HolidayTracker({ session }) {
         return;
       }
 
-      // Delete allowance entry
+      // Delete all allowance entries for this category (all years)
       await supabase
         .from('allowances')
         .delete()
@@ -550,6 +583,7 @@ function HolidayTracker({ session }) {
   const monthName = currentDate.toLocaleString('default', { month: 'long', year: 'numeric' });
   const daysOfWeek = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
   const monthNames = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+  const currentYear = currentDate.getFullYear();
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-indigo-50 via-blue-50 to-cyan-50 p-2 sm:p-6">
@@ -871,7 +905,13 @@ function HolidayTracker({ session }) {
 
           {(!isPrinting || printIncludeBreakdown) && (
             <div className="category-breakdown">
-              <h2 className="text-lg sm:text-xl font-semibold text-gray-800 mb-4">Category Breakdown</h2>
+              <div className="flex items-center justify-between mb-4">
+                <h2 className="text-lg sm:text-xl font-semibold text-gray-800">Category Breakdown</h2>
+                <div className="flex items-center gap-2 px-3 py-1 bg-blue-50 border border-blue-200 rounded-lg">
+                  <span className="text-sm font-medium text-blue-700">Year:</span>
+                  <span className="text-sm font-bold text-blue-900">{currentYear}</span>
+                </div>
+              </div>
               <div className="overflow-x-auto mb-6 sm:mb-8 -mx-4 sm:mx-0">
                 <div className="inline-block min-w-full align-middle px-4 sm:px-0">
                   <table className="w-full text-sm sm:text-base">
