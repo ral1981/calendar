@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from './supabaseClient';
 import Auth from './Auth';
-import { ChevronLeft, ChevronRight, Trash2, Printer, LogOut, CalendarSearch, ArrowUp } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Trash2, Printer, LogOut, CalendarSearch, ArrowUp, Settings } from 'lucide-react';
 
 function App() {
   const [session, setSession] = useState(null);
@@ -38,20 +38,14 @@ function App() {
 }
 
 function HolidayTracker({ session }) {
-  const categories = [
-    'Bank Holidays',
-    'Birthday',
-    'Vacation',
-    'Volunteer Days',
-    'Wellness Days',
-    'Winter Holidays'
-  ].sort();
-
+  // Replace hardcoded categories with state
+  const [categories, setCategories] = useState([]);
+  
   const [allowances, setAllowances] = useState({});
   const [holidays, setHolidays] = useState([]);
   const [loading, setLoading] = useState(true);
   const [currentDate, setCurrentDate] = useState(new Date(2025, 9, 1));
-  const [selectedCategory, setSelectedCategory] = useState('Bank Holidays');
+  const [selectedCategory, setSelectedCategory] = useState('');
   const [showYearView, setShowYearView] = useState(false);
   const [showPrintOptions, setShowPrintOptions] = useState(false);
   const [isPrinting, setIsPrinting] = useState(false);
@@ -60,16 +54,34 @@ function HolidayTracker({ session }) {
   const [printIncludeCalendar, setPrintIncludeCalendar] = useState(true);
   const [printIncludeEntries, setPrintIncludeEntries] = useState(false);
   const [showBackToTop, setShowBackToTop] = useState(false);
+  
+  // Category management state
+  const [showCategoryManager, setShowCategoryManager] = useState(false);
+  const [newCategoryName, setNewCategoryName] = useState('');
+  const [newCategoryAllowance, setNewCategoryAllowance] = useState(0);
+  const [newCategoryColor, setNewCategoryColor] = useState('bg-blue-500');
+
+  // Available colors for categories
+  const availableColors = [
+    'bg-red-500', 'bg-orange-500', 'bg-amber-500', 'bg-yellow-500',
+    'bg-lime-500', 'bg-green-500', 'bg-emerald-500', 'bg-teal-500',
+    'bg-cyan-500', 'bg-sky-500', 'bg-blue-500', 'bg-indigo-500',
+    'bg-violet-500', 'bg-purple-500', 'bg-fuchsia-500', 'bg-pink-500',
+    'bg-rose-500', 'bg-gray-500'
+  ];
 
   useEffect(() => {
-    loadAllowances();
-    loadHolidays();
+    const loadData = async () => {
+      await loadCategories();
+      await loadAllowances();
+      await loadHolidays();
+    };
+    loadData();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   useEffect(() => {
     const handleScroll = () => {
-      // Show button after scrolling down 300px
       setShowBackToTop(window.scrollY > 300);
     };
 
@@ -77,16 +89,192 @@ function HolidayTracker({ session }) {
     return () => window.removeEventListener('scroll', handleScroll);
   }, []);
 
-  const getDefaultAllowance = (category) => {
-    const defaults = {
-      'Bank Holidays': 8,
-      'Volunteer Days': 2,
-      'Wellness Days': 3,
-      'Birthday': 1,
-      'Vacation': 20,
-      'Winter Holidays': 5
-    };
-    return defaults[category] || 0;
+  // Load categories from database
+  const loadCategories = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('categories')
+        .select('*')
+        .eq('user_id', session.user.id)
+        .order('name');
+
+      if (error) throw error;
+
+      if (data.length === 0) {
+        // Initialize default categories for new users
+        await initializeDefaultCategories();
+      } else {
+        setCategories(data);
+        // Set first category as selected if none selected
+        if (!selectedCategory && data.length > 0) {
+          setSelectedCategory(data[0].name);
+        }
+      }
+    } catch (error) {
+      console.error('Error loading categories:', error);
+    }
+  };
+
+  // Initialize default categories for new users
+  const initializeDefaultCategories = async () => {
+    const defaultCategories = [
+      { name: 'Bank Holidays', default_allowance: 8, color: 'bg-rose-500' },
+      { name: 'Birthday', default_allowance: 1, color: 'bg-violet-500' },
+      { name: 'Vacation', default_allowance: 20, color: 'bg-blue-500' },
+      { name: 'Volunteer Days', default_allowance: 2, color: 'bg-emerald-500' },
+      { name: 'Wellness Days', default_allowance: 3, color: 'bg-amber-500' },
+      { name: 'Winter Holidays', default_allowance: 5, color: 'bg-cyan-500' }
+    ];
+
+    try {
+      const categoriesToInsert = defaultCategories.map(cat => ({
+        user_id: session.user.id,
+        name: cat.name,
+        default_allowance: cat.default_allowance,
+        color: cat.color
+      }));
+
+      const { data, error } = await supabase
+        .from('categories')
+        .insert(categoriesToInsert)
+        .select();
+
+      if (error) throw error;
+      
+      setCategories(data);
+      if (data.length > 0) {
+        setSelectedCategory(data[0].name);
+      }
+
+      // Initialize allowances for default categories
+      for (const cat of defaultCategories) {
+        await updateAllowance(cat.name, cat.default_allowance);
+      }
+    } catch (error) {
+      console.error('Error initializing categories:', error);
+    }
+  };
+
+  // Add a new category
+  const addCategory = async (name, defaultAllowance = 0, color = 'bg-gray-500') => {
+    try {
+      const { data, error } = await supabase
+        .from('categories')
+        .insert({
+          user_id: session.user.id,
+          name: name.trim(),
+          default_allowance: defaultAllowance,
+          color
+        })
+        .select()
+        .single();
+
+      if (error) throw error;
+
+      setCategories([...categories, data].sort((a, b) => a.name.localeCompare(b.name)));
+      
+      // Initialize allowance for new category
+      await updateAllowance(name, defaultAllowance);
+      
+      return { success: true };
+    } catch (error) {
+      console.error('Error adding category:', error);
+      if (error.code === '23505') {
+        return { success: false, error: 'A category with this name already exists.' };
+      }
+      return { success: false, error: error.message };
+    }
+  };
+
+  // Delete a category
+  const deleteCategory = async (categoryId, categoryName) => {
+    try {
+      // Check if category has any holidays
+      const { data: existingHolidays, error: checkError } = await supabase
+        .from('holidays')
+        .select('id')
+        .eq('user_id', session.user.id)
+        .eq('category', categoryName)
+        .limit(1);
+
+      if (checkError) throw checkError;
+
+      if (existingHolidays && existingHolidays.length > 0) {
+        return { 
+          success: false, 
+          error: 'Cannot delete category with existing holidays. Please delete all holidays in this category first.' 
+        };
+      }
+
+      // Delete allowance entry
+      await supabase
+        .from('allowances')
+        .delete()
+        .eq('user_id', session.user.id)
+        .eq('category', categoryName);
+
+      // Delete category
+      const { error } = await supabase
+        .from('categories')
+        .delete()
+        .eq('id', categoryId);
+
+      if (error) throw error;
+
+      const updatedCategories = categories.filter(cat => cat.id !== categoryId);
+      setCategories(updatedCategories);
+      
+      // Update local state
+      const newAllowances = { ...allowances };
+      delete newAllowances[categoryName];
+      setAllowances(newAllowances);
+      
+      // If deleted category was selected, switch to first available
+      if (selectedCategory === categoryName && updatedCategories.length > 0) {
+        setSelectedCategory(updatedCategories[0].name);
+      }
+
+      return { success: true };
+    } catch (error) {
+      console.error('Error deleting category:', error);
+      return { success: false, error: error.message };
+    }
+  };
+
+  const handleAddCategory = async (e) => {
+    e.preventDefault();
+    
+    if (!newCategoryName.trim()) {
+      alert('Please enter a category name');
+      return;
+    }
+
+    const result = await addCategory(newCategoryName, newCategoryAllowance, newCategoryColor);
+    
+    if (result.success) {
+      setNewCategoryName('');
+      setNewCategoryAllowance(0);
+      setNewCategoryColor('bg-blue-500');
+    } else {
+      alert(result.error || 'Failed to add category');
+    }
+  };
+
+  const handleDeleteCategory = async (categoryId, categoryName) => {
+    if (!window.confirm(`Are you sure you want to delete "${categoryName}"? This action cannot be undone.`)) {
+      return;
+    }
+
+    const result = await deleteCategory(categoryId, categoryName);
+    
+    if (!result.success) {
+      alert(result.error || 'Failed to delete category');
+    }
+  };
+
+  const getDefaultAllowance = (categoryName) => {
+    const category = categories.find(cat => cat.name === categoryName);
+    return category?.default_allowance || 0;
   };
 
   const scrollToTop = () => {
@@ -110,9 +298,10 @@ function HolidayTracker({ session }) {
         allowancesObj[item.category] = item.total;
       });
 
+      // Initialize allowances for categories that don't have them yet
       categories.forEach(cat => {
-        if (!allowancesObj[cat]) {
-          allowancesObj[cat] = getDefaultAllowance(cat);
+        if (!allowancesObj[cat.name]) {
+          allowancesObj[cat.name] = getDefaultAllowance(cat.name);
         }
       });
 
@@ -270,7 +459,6 @@ function HolidayTracker({ session }) {
     setIsPrinting(true);
     setTimeout(() => {
       window.print();
-      // Reset isPrinting after print dialog closes
       setTimeout(() => setIsPrinting(false), 100);
     }, 100);
   };
@@ -287,7 +475,7 @@ function HolidayTracker({ session }) {
   const calculateTotals = () => {
     let totalAllowed = 0, totalSpent = 0, totalRequested = 0;
     categories.forEach(cat => {
-      const stats = calculateStats(cat);
+      const stats = calculateStats(cat.name);
       totalAllowed += stats.total;
       totalSpent += stats.spent;
       totalRequested += stats.requested;
@@ -295,16 +483,9 @@ function HolidayTracker({ session }) {
     return { totalAllowed, totalSpent, totalRequested, totalPending: totalAllowed - totalSpent - totalRequested };
   };
 
-  const getCategoryColor = (category) => {
-    const colors = {
-      'Bank Holidays': 'bg-rose-500',
-      'Birthday': 'bg-violet-500',
-      'Vacation': 'bg-blue-500',
-      'Volunteer Days': 'bg-emerald-500',
-      'Wellness Days': 'bg-amber-500',
-      'Winter Holidays': 'bg-cyan-500'
-    };
-    return colors[category] || 'bg-gray-500';
+  const getCategoryColor = (categoryName) => {
+    const category = categories.find(cat => cat.name === categoryName);
+    return category?.color || 'bg-gray-500';
   };
 
   const BatteryGauge = ({ percent }) => {
@@ -347,7 +528,6 @@ function HolidayTracker({ session }) {
     <div className="min-h-screen bg-gradient-to-br from-indigo-50 via-blue-50 to-cyan-50 p-2 sm:p-6">
       <style>{`
         @media print {
-          /* Enable background colors for printing */
           body { 
             background: white !important;
             -webkit-print-color-adjust: exact !important;
@@ -360,14 +540,12 @@ function HolidayTracker({ session }) {
             color-adjust: exact !important;
           }
           
-          /* Basic print styles */
           .no-print { display: none !important; }
           .print-only { display: block !important; }
           .bg-gradient-to-br { background: white !important; }
           .shadow-lg { box-shadow: none !important; }
           button { pointer-events: none; }
           
-          /* CRITICAL: Prevent page breaks within calendar section */
           .calendar-section {
             page-break-inside: avoid !important;
             break-inside: avoid !important;
@@ -376,48 +554,40 @@ function HolidayTracker({ session }) {
             display: block !important;
           }
           
-          /* Ensure calendar background container doesn't break */
           .calendar-section .bg-gray-50 {
             page-break-inside: avoid !important;
             break-inside: avoid !important;
           }
           
-          /* Scale down calendar to fit A4 page */
           .calendar-section {
             transform: scale(0.85);
             transform-origin: top center;
             margin-bottom: -2rem !important;
           }
           
-          /* Year view: make more compact */
           .calendar-section .grid.grid-cols-2,
           .calendar-section .grid.grid-cols-3 {
             gap: 0.25rem !important;
             padding: 0.5rem !important;
           }
           
-          /* Month view: ensure single page */
           .calendar-section .grid.grid-cols-7 {
             font-size: 0.875rem !important;
           }
           
-          /* Reduce padding in calendar section for print */
           .calendar-section .bg-gray-50 {
             padding: 0.75rem !important;
           }
           
-          /* Category breakdown: prevent orphaning */
           .bg-white.rounded-lg {
             page-break-inside: avoid !important;
             break-inside: avoid !important;
           }
           
-          /* Allow page break before calendar if needed */
           .calendar-section {
             page-break-before: auto !important;
           }
           
-          /* Ensure total allowance cards don't break */
           .grid.grid-cols-2.gap-2 {
             page-break-inside: avoid !important;
             break-inside: avoid !important;
@@ -426,8 +596,15 @@ function HolidayTracker({ session }) {
         .print-only { display: none; }
       `}</style>
       
-      {/* Floating Action Buttons - Print and Logout */}
+      {/* Floating Action Buttons */}
       <div className="no-print fixed top-4 right-4 z-50 flex flex-col gap-3">
+        <button
+          onClick={() => setShowCategoryManager(true)}
+          className="bg-white hover:bg-gray-50 p-3 rounded-full shadow-lg hover:shadow-xl transition-all duration-200 border border-gray-200 group"
+          title="Manage Categories"
+        >
+          <Settings className="w-5 h-5 text-gray-700 group-hover:text-blue-600 transition-colors" />
+        </button>
         <button
           onClick={() => {
             setShowPrintOptions(!showPrintOptions);
@@ -474,6 +651,94 @@ function HolidayTracker({ session }) {
             >
               <ArrowUp className="w-5 h-5 sm:w-6 sm:h-6" />
             </button>
+          )}
+
+          {/* Category Manager Modal */}
+          {showCategoryManager && (
+            <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+              <div className="bg-white rounded-lg p-6 max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+                <div className="flex justify-between items-center mb-4">
+                  <h2 className="text-xl font-bold text-gray-800">Manage Categories</h2>
+                  <button
+                    onClick={() => setShowCategoryManager(false)}
+                    className="text-gray-500 hover:text-gray-700 text-2xl leading-none"
+                  >
+                    ×
+                  </button>
+                </div>
+
+                {/* Add new category form */}
+                <form onSubmit={handleAddCategory} className="mb-6 p-4 bg-gray-50 rounded-lg">
+                  <h3 className="font-semibold mb-3">Add New Category</h3>
+                  <div className="space-y-3">
+                    <input
+                      type="text"
+                      value={newCategoryName}
+                      onChange={(e) => setNewCategoryName(e.target.value)}
+                      placeholder="Category name"
+                      className="w-full px-3 py-2 border rounded-lg"
+                      maxLength={50}
+                    />
+                    <input
+                      type="number"
+                      value={newCategoryAllowance}
+                      onChange={(e) => setNewCategoryAllowance(parseInt(e.target.value) || 0)}
+                      placeholder="Default allowance (days)"
+                      className="w-full px-3 py-2 border rounded-lg"
+                      min="0"
+                    />
+                    <div>
+                      <label className="block text-sm font-medium mb-2">Color</label>
+                      <div className="grid grid-cols-9 gap-2">
+                        {availableColors.map(color => (
+                          <button
+                            key={color}
+                            type="button"
+                            onClick={() => setNewCategoryColor(color)}
+                            className={`w-8 h-8 rounded ${color} ${
+                              newCategoryColor === color ? 'ring-2 ring-offset-2 ring-gray-800' : ''
+                            }`}
+                          />
+                        ))}
+                      </div>
+                    </div>
+                    <button
+                      type="submit"
+                      className="w-full bg-blue-600 text-white py-2 rounded-lg hover:bg-blue-700"
+                    >
+                      Add Category
+                    </button>
+                  </div>
+                </form>
+
+                {/* Existing categories list */}
+                <div>
+                  <h3 className="font-semibold mb-3">Your Categories</h3>
+                  <div className="space-y-2">
+                    {categories.map(category => (
+                      <div
+                        key={category.id}
+                        className="flex items-center justify-between p-3 bg-gray-50 rounded-lg"
+                      >
+                        <div className="flex items-center gap-3">
+                          <div className={`w-4 h-4 rounded ${category.color}`}></div>
+                          <span className="font-medium">{category.name}</span>
+                          <span className="text-sm text-gray-500">
+                            ({category.default_allowance} days default)
+                          </span>
+                        </div>
+                        <button
+                          onClick={() => handleDeleteCategory(category.id, category.name)}
+                          className="text-red-500 hover:text-red-700 p-1"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            </div>
           )}
 
           {showPrintOptions && (
@@ -579,17 +844,17 @@ function HolidayTracker({ session }) {
                     </thead>
                     <tbody>
                       {categories.map(category => {
-                        const stats = calculateStats(category);
+                        const stats = calculateStats(category.name);
                         const percentRemaining = stats.total > 0 ? (stats.pending / stats.total) * 100 : 0;
                         
                         return (
-                          <tr key={category} className="border-b border-gray-100 hover:bg-gray-50">
-                            <td className="py-2 sm:py-3 px-2 sm:px-4 font-medium text-gray-800 text-xs sm:text-base">{category}</td>
+                          <tr key={category.id} className="border-b border-gray-100 hover:bg-gray-50">
+                            <td className="py-2 sm:py-3 px-2 sm:px-4 font-medium text-gray-800 text-xs sm:text-base">{category.name}</td>
                             <td className="text-center py-2 sm:py-3 px-2 sm:px-4">
                               <input
                                 type="number"
                                 value={stats.total}
-                                onChange={(e) => updateAllowance(category, e.target.value)}
+                                onChange={(e) => updateAllowance(category.name, e.target.value)}
                                 className="no-print w-12 sm:w-16 text-center border border-gray-300 rounded px-1 sm:px-2 py-1 text-sm"
                                 min="0"
                               />
@@ -624,11 +889,11 @@ function HolidayTracker({ session }) {
                       className="w-full sm:w-auto border border-gray-300 rounded px-3 py-2 text-sm"
                     >
                       {categories.map(cat => {
-                        const stats = calculateStats(cat);
+                        const stats = calculateStats(cat.name);
                         const isDisabled = stats.pending <= 0;
                         return (
-                          <option key={cat} value={cat} disabled={isDisabled}>
-                            {cat} {isDisabled ? '(No days remaining)' : `(${stats.pending} remaining)`}
+                          <option key={cat.id} value={cat.name} disabled={isDisabled}>
+                            {cat.name} {isDisabled ? '(No days remaining)' : `(${stats.pending} remaining)`}
                           </option>
                         );
                       })}
@@ -780,9 +1045,9 @@ function HolidayTracker({ session }) {
 
                 <div className="mt-4 flex flex-wrap gap-2 sm:gap-3">
                   {categories.map(cat => (
-                    <div key={cat} className="flex items-center gap-2">
-                      <div className={`w-3 h-3 sm:w-4 sm:h-4 rounded ${getCategoryColor(cat)}`}></div>
-                      <span className="text-xs sm:text-sm text-gray-700">{cat}</span>
+                    <div key={cat.id} className="flex items-center gap-2">
+                      <div className={`w-3 h-3 sm:w-4 sm:h-4 rounded ${getCategoryColor(cat.name)}`}></div>
+                      <span className="text-xs sm:text-sm text-gray-700">{cat.name}</span>
                     </div>
                   ))}
                 </div>
