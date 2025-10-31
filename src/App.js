@@ -38,9 +38,7 @@ function App() {
 }
 
 function HolidayTracker({ session }) {
-  // Replace hardcoded categories with state
   const [categories, setCategories] = useState([]);
-  
   const [allowances, setAllowances] = useState({});
   const [holidays, setHolidays] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -55,13 +53,13 @@ function HolidayTracker({ session }) {
   const [printIncludeEntries, setPrintIncludeEntries] = useState(false);
   const [showBackToTop, setShowBackToTop] = useState(false);
   
-  // Category management state
+  // Category management states
   const [showCategoryManager, setShowCategoryManager] = useState(false);
   const [newCategoryName, setNewCategoryName] = useState('');
   const [newCategoryAllowance, setNewCategoryAllowance] = useState(0);
   const [newCategoryColor, setNewCategoryColor] = useState('bg-blue-500');
+  const [editingCategoryId, setEditingCategoryId] = useState(null);
 
-  // Available colors for categories
   const availableColors = [
     'bg-red-500', 'bg-orange-500', 'bg-amber-500', 'bg-yellow-500',
     'bg-lime-500', 'bg-green-500', 'bg-emerald-500', 'bg-teal-500',
@@ -71,12 +69,9 @@ function HolidayTracker({ session }) {
   ];
 
   useEffect(() => {
-    const loadData = async () => {
-      await loadCategories();
-      await loadAllowances();
-      await loadHolidays();
-    };
-    loadData();
+    loadCategories();
+    loadAllowances();
+    loadHolidays();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -89,7 +84,6 @@ function HolidayTracker({ session }) {
     return () => window.removeEventListener('scroll', handleScroll);
   }, []);
 
-  // Load categories from database
   const loadCategories = async () => {
     try {
       const { data, error } = await supabase
@@ -101,12 +95,10 @@ function HolidayTracker({ session }) {
       if (error) throw error;
 
       if (data.length === 0) {
-        // Initialize default categories for new users
         await initializeDefaultCategories();
       } else {
         setCategories(data);
-        // Set first category as selected if none selected
-        if (!selectedCategory && data.length > 0) {
+        if (data.length > 0 && !selectedCategory) {
           setSelectedCategory(data[0].name);
         }
       }
@@ -115,15 +107,13 @@ function HolidayTracker({ session }) {
     }
   };
 
-  // Initialize default categories for new users
   const initializeDefaultCategories = async () => {
     const defaultCategories = [
-      { name: 'Bank Holidays', default_allowance: 8, color: 'bg-rose-500' },
-      { name: 'Birthday', default_allowance: 1, color: 'bg-violet-500' },
-      { name: 'Vacation', default_allowance: 20, color: 'bg-blue-500' },
-      { name: 'Volunteer Days', default_allowance: 2, color: 'bg-emerald-500' },
-      { name: 'Wellness Days', default_allowance: 3, color: 'bg-amber-500' },
-      { name: 'Winter Holidays', default_allowance: 5, color: 'bg-cyan-500' }
+      { name: 'Bank Holidays', default_allowance: 13, color: 'bg-rose-500' },
+      { name: 'Birthday', default_allowance: 0, color: 'bg-violet-500' },
+      { name: 'Vacation', default_allowance: 25, color: 'bg-blue-500' },
+      { name: 'Wellness', default_allowance: 3, color: 'bg-gray-500' },
+      { name: 'Winter Holidays', default_allowance: 3, color: 'bg-cyan-500' }
     ];
 
     try {
@@ -140,141 +130,13 @@ function HolidayTracker({ session }) {
         .select();
 
       if (error) throw error;
-      
       setCategories(data);
       if (data.length > 0) {
         setSelectedCategory(data[0].name);
       }
-
-      // Initialize allowances for default categories
-      for (const cat of defaultCategories) {
-        await updateAllowance(cat.name, cat.default_allowance);
-      }
     } catch (error) {
       console.error('Error initializing categories:', error);
     }
-  };
-
-  // Add a new category
-  const addCategory = async (name, defaultAllowance = 0, color = 'bg-gray-500') => {
-    try {
-      const { data, error } = await supabase
-        .from('categories')
-        .insert({
-          user_id: session.user.id,
-          name: name.trim(),
-          default_allowance: defaultAllowance,
-          color
-        })
-        .select()
-        .single();
-
-      if (error) throw error;
-
-      setCategories([...categories, data].sort((a, b) => a.name.localeCompare(b.name)));
-      
-      // Initialize allowance for new category
-      await updateAllowance(name, defaultAllowance);
-      
-      return { success: true };
-    } catch (error) {
-      console.error('Error adding category:', error);
-      if (error.code === '23505') {
-        return { success: false, error: 'A category with this name already exists.' };
-      }
-      return { success: false, error: error.message };
-    }
-  };
-
-  // Delete a category
-  const deleteCategory = async (categoryId, categoryName) => {
-    try {
-      // Check if category has any holidays
-      const { data: existingHolidays, error: checkError } = await supabase
-        .from('holidays')
-        .select('id')
-        .eq('user_id', session.user.id)
-        .eq('category', categoryName)
-        .limit(1);
-
-      if (checkError) throw checkError;
-
-      if (existingHolidays && existingHolidays.length > 0) {
-        return { 
-          success: false, 
-          error: 'Cannot delete category with existing holidays. Please delete all holidays in this category first.' 
-        };
-      }
-
-      // Delete allowance entry
-      await supabase
-        .from('allowances')
-        .delete()
-        .eq('user_id', session.user.id)
-        .eq('category', categoryName);
-
-      // Delete category
-      const { error } = await supabase
-        .from('categories')
-        .delete()
-        .eq('id', categoryId);
-
-      if (error) throw error;
-
-      const updatedCategories = categories.filter(cat => cat.id !== categoryId);
-      setCategories(updatedCategories);
-      
-      // Update local state
-      const newAllowances = { ...allowances };
-      delete newAllowances[categoryName];
-      setAllowances(newAllowances);
-      
-      // If deleted category was selected, switch to first available
-      if (selectedCategory === categoryName && updatedCategories.length > 0) {
-        setSelectedCategory(updatedCategories[0].name);
-      }
-
-      return { success: true };
-    } catch (error) {
-      console.error('Error deleting category:', error);
-      return { success: false, error: error.message };
-    }
-  };
-
-  const handleAddCategory = async (e) => {
-    e.preventDefault();
-    
-    if (!newCategoryName.trim()) {
-      alert('Please enter a category name');
-      return;
-    }
-
-    const result = await addCategory(newCategoryName, newCategoryAllowance, newCategoryColor);
-    
-    if (result.success) {
-      setNewCategoryName('');
-      setNewCategoryAllowance(0);
-      setNewCategoryColor('bg-blue-500');
-    } else {
-      alert(result.error || 'Failed to add category');
-    }
-  };
-
-  const handleDeleteCategory = async (categoryId, categoryName) => {
-    if (!window.confirm(`Are you sure you want to delete "${categoryName}"? This action cannot be undone.`)) {
-      return;
-    }
-
-    const result = await deleteCategory(categoryId, categoryName);
-    
-    if (!result.success) {
-      alert(result.error || 'Failed to delete category');
-    }
-  };
-
-  const getDefaultAllowance = (categoryName) => {
-    const category = categories.find(cat => cat.name === categoryName);
-    return category?.default_allowance || 0;
   };
 
   const scrollToTop = () => {
@@ -296,13 +158,6 @@ function HolidayTracker({ session }) {
       const allowancesObj = {};
       data.forEach(item => {
         allowancesObj[item.category] = item.total;
-      });
-
-      // Initialize allowances for categories that don't have them yet
-      categories.forEach(cat => {
-        if (!allowancesObj[cat.name]) {
-          allowancesObj[cat.name] = getDefaultAllowance(cat.name);
-        }
       });
 
       setAllowances(allowancesObj);
@@ -467,7 +322,8 @@ function HolidayTracker({ session }) {
     const categoryHolidays = holidays.filter(h => h.category === category);
     const spent = categoryHolidays.filter(h => h.status === 'spent').reduce((sum, h) => sum + h.days, 0);
     const requested = categoryHolidays.filter(h => h.status === 'requested').reduce((sum, h) => sum + h.days, 0);
-    const total = allowances[category] || 0;
+    const cat = categories.find(c => c.name === category);
+    const total = allowances[category] !== undefined ? allowances[category] : (cat?.default_allowance || 0);
     const pending = total - spent - requested;
     return { total, spent, requested, pending };
   };
@@ -486,6 +342,177 @@ function HolidayTracker({ session }) {
   const getCategoryColor = (categoryName) => {
     const category = categories.find(cat => cat.name === categoryName);
     return category?.color || 'bg-gray-500';
+  };
+
+  const addCategory = async (e) => {
+    e.preventDefault();
+    
+    if (!newCategoryName.trim()) {
+      alert('Please enter a category name');
+      return;
+    }
+
+    try {
+      const { data, error } = await supabase
+        .from('categories')
+        .insert({
+          user_id: session.user.id,
+          name: newCategoryName.trim(),
+          default_allowance: newCategoryAllowance,
+          color: newCategoryColor
+        })
+        .select()
+        .single();
+
+      if (error) throw error;
+
+      setCategories([...categories, data]);
+      await updateAllowance(newCategoryName.trim(), newCategoryAllowance);
+      
+      setNewCategoryName('');
+      setNewCategoryAllowance(0);
+      setNewCategoryColor('bg-blue-500');
+    } catch (error) {
+      console.error('Error adding category:', error);
+      alert(error.message || 'Failed to add category');
+    }
+  };
+
+  const updateCategory = async (e) => {
+    e.preventDefault();
+    
+    if (!newCategoryName.trim()) {
+      alert('Please enter a category name');
+      return;
+    }
+
+    const categoryToUpdate = categories.find(c => c.id === editingCategoryId);
+    if (!categoryToUpdate) return;
+
+    try {
+      const { data, error } = await supabase
+        .from('categories')
+        .update({
+          name: newCategoryName.trim(),
+          default_allowance: newCategoryAllowance,
+          color: newCategoryColor
+        })
+        .eq('id', editingCategoryId)
+        .select()
+        .single();
+
+      if (error) throw error;
+
+      // Update holidays with the new category name if it changed
+      if (categoryToUpdate.name !== newCategoryName.trim()) {
+        await supabase
+          .from('holidays')
+          .update({ category: newCategoryName.trim() })
+          .eq('user_id', session.user.id)
+          .eq('category', categoryToUpdate.name);
+
+        // Update allowances
+        await supabase
+          .from('allowances')
+          .update({ category: newCategoryName.trim() })
+          .eq('user_id', session.user.id)
+          .eq('category', categoryToUpdate.name);
+
+        // Update local state
+        setHolidays(holidays.map(h => 
+          h.category === categoryToUpdate.name 
+            ? { ...h, category: newCategoryName.trim() }
+            : h
+        ));
+
+        const newAllowances = { ...allowances };
+        if (newAllowances[categoryToUpdate.name] !== undefined) {
+          newAllowances[newCategoryName.trim()] = newAllowances[categoryToUpdate.name];
+          delete newAllowances[categoryToUpdate.name];
+          setAllowances(newAllowances);
+        }
+
+        if (selectedCategory === categoryToUpdate.name) {
+          setSelectedCategory(newCategoryName.trim());
+        }
+      }
+
+      setCategories(categories.map(c => c.id === editingCategoryId ? data : c));
+      
+      // Update allowance with new value
+      await updateAllowance(newCategoryName.trim(), newCategoryAllowance);
+      
+      cancelEdit();
+    } catch (error) {
+      console.error('Error updating category:', error);
+      alert(error.message || 'Failed to update category');
+    }
+  };
+
+  const deleteCategory = async (categoryId, categoryName) => {
+    if (!window.confirm(`Are you sure you want to delete "${categoryName}"? This action cannot be undone.`)) {
+      return;
+    }
+
+    try {
+      // Check if category has any holidays
+      const { data: existingHolidays, error: checkError } = await supabase
+        .from('holidays')
+        .select('id')
+        .eq('user_id', session.user.id)
+        .eq('category', categoryName)
+        .limit(1);
+
+      if (checkError) throw checkError;
+
+      if (existingHolidays && existingHolidays.length > 0) {
+        alert('Cannot delete category with existing holidays. Please delete all holidays in this category first.');
+        return;
+      }
+
+      // Delete allowance entry
+      await supabase
+        .from('allowances')
+        .delete()
+        .eq('user_id', session.user.id)
+        .eq('category', categoryName);
+
+      // Delete category
+      const { error } = await supabase
+        .from('categories')
+        .delete()
+        .eq('id', categoryId);
+
+      if (error) throw error;
+
+      setCategories(categories.filter(cat => cat.id !== categoryId));
+      
+      const newAllowances = { ...allowances };
+      delete newAllowances[categoryName];
+      setAllowances(newAllowances);
+      
+      if (selectedCategory === categoryName && categories.length > 1) {
+        const remainingCategories = categories.filter(c => c.id !== categoryId);
+        setSelectedCategory(remainingCategories[0]?.name || '');
+      }
+    } catch (error) {
+      console.error('Error deleting category:', error);
+      alert(error.message || 'Failed to delete category');
+    }
+  };
+
+  const editCategory = (category) => {
+    setEditingCategoryId(category.id);
+    setNewCategoryName(category.name);
+    setNewCategoryAllowance(category.default_allowance);
+    setNewCategoryColor(category.color);
+  };
+
+  const cancelEdit = () => {
+    setEditingCategoryId(null);
+    setNewCategoryName('');
+    setNewCategoryAllowance(0);
+    setNewCategoryColor('bg-blue-500');
   };
 
   const BatteryGauge = ({ percent }) => {
@@ -596,7 +623,6 @@ function HolidayTracker({ session }) {
         .print-only { display: none; }
       `}</style>
       
-      {/* Floating Action Buttons */}
       <div className="no-print fixed top-4 right-4 z-50 flex flex-col gap-3">
         <button
           onClick={() => setShowCategoryManager(true)}
@@ -653,23 +679,24 @@ function HolidayTracker({ session }) {
             </button>
           )}
 
-          {/* Category Manager Modal */}
           {showCategoryManager && (
             <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
               <div className="bg-white rounded-lg p-6 max-w-2xl w-full max-h-[90vh] overflow-y-auto">
                 <div className="flex justify-between items-center mb-4">
                   <h2 className="text-xl font-bold text-gray-800">Manage Categories</h2>
                   <button
-                    onClick={() => setShowCategoryManager(false)}
-                    className="text-gray-500 hover:text-gray-700 text-2xl leading-none"
+                    onClick={() => {
+                      setShowCategoryManager(false);
+                      cancelEdit();
+                    }}
+                    className="text-gray-500 hover:text-gray-700"
                   >
-                    ×
+                    ✕
                   </button>
                 </div>
 
-                {/* Add new category form */}
-                <form onSubmit={handleAddCategory} className="mb-6 p-4 bg-gray-50 rounded-lg">
-                  <h3 className="font-semibold mb-3">Add New Category</h3>
+                <form onSubmit={editingCategoryId ? updateCategory : addCategory} className="mb-6 p-4 bg-gray-50 rounded-lg">
+                  <h3 className="font-semibold mb-3">{editingCategoryId ? 'Edit Category' : 'Add New Category'}</h3>
                   <div className="space-y-3">
                     <input
                       type="text"
@@ -683,7 +710,7 @@ function HolidayTracker({ session }) {
                       type="number"
                       value={newCategoryAllowance}
                       onChange={(e) => setNewCategoryAllowance(parseInt(e.target.value) || 0)}
-                      placeholder="Default allowance (days)"
+                      placeholder="Default allowance"
                       className="w-full px-3 py-2 border rounded-lg"
                       min="0"
                     />
@@ -702,23 +729,36 @@ function HolidayTracker({ session }) {
                         ))}
                       </div>
                     </div>
-                    <button
-                      type="submit"
-                      className="w-full bg-blue-600 text-white py-2 rounded-lg hover:bg-blue-700"
-                    >
-                      Add Category
-                    </button>
+                    <div className="flex gap-2">
+                      <button
+                        type="submit"
+                        className="flex-1 bg-blue-600 text-white py-2 rounded-lg hover:bg-blue-700"
+                      >
+                        {editingCategoryId ? 'Update Category' : 'Add Category'}
+                      </button>
+                      {editingCategoryId && (
+                        <button
+                          type="button"
+                          onClick={cancelEdit}
+                          className="px-4 bg-gray-300 text-gray-700 py-2 rounded-lg hover:bg-gray-400"
+                        >
+                          Cancel
+                        </button>
+                      )}
+                    </div>
                   </div>
                 </form>
 
-                {/* Existing categories list */}
                 <div>
                   <h3 className="font-semibold mb-3">Your Categories</h3>
                   <div className="space-y-2">
                     {categories.map(category => (
                       <div
                         key={category.id}
-                        className="flex items-center justify-between p-3 bg-gray-50 rounded-lg"
+                        onClick={() => editCategory(category)}
+                        className={`flex items-center justify-between p-3 rounded-lg cursor-pointer transition-colors ${
+                          editingCategoryId === category.id ? 'bg-blue-100' : 'bg-gray-50 hover:bg-gray-100'
+                        }`}
                       >
                         <div className="flex items-center gap-3">
                           <div className={`w-4 h-4 rounded ${category.color}`}></div>
@@ -728,7 +768,10 @@ function HolidayTracker({ session }) {
                           </span>
                         </div>
                         <button
-                          onClick={() => handleDeleteCategory(category.id, category.name)}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            deleteCategory(category.id, category.name);
+                          }}
                           className="text-red-500 hover:text-red-700 p-1"
                         >
                           <Trash2 className="w-4 h-4" />
