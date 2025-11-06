@@ -1177,9 +1177,9 @@ function HolidayTracker({ session }) {
                                   />
                                   <span className="print-only">{stats.total}</span>
                                 </td>
-                                <td className="text-center py-2 sm:py-3 px-2 sm:px-4 text-green-600 font-semibold">{stats.spent}</td>
+                                <td className="text-center py-2 sm:py-3 px-2 sm:px-4 text-red-600 font-semibold">{stats.spent}</td>
                                 <td className="text-center py-2 sm:py-3 px-2 sm:px-4 text-amber-600 font-semibold">{stats.requested}</td>
-                                <td className="text-center py-2 sm:py-3 px-2 sm:px-4 text-blue-600 font-semibold">{stats.pending}</td>
+                                <td className="text-center py-2 sm:py-3 px-2 sm:px-4 text-green-600 font-semibold">{stats.pending}</td>
                                 <td className="py-2 sm:py-3 px-1 sm:px-2 flex justify-center">
                                   <BatteryGauge percent={percentRemaining} />
                                 </td>
