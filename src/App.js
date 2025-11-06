@@ -405,6 +405,16 @@ function HolidayTracker({ session }) {
     }, 100);
   };
 
+  const toggleAllPrintOptions = () => {
+    const allChecked = printIncludeTotals && printIncludeBreakdown && printIncludeCalendar && printIncludeEntries;
+    const newValue = !allChecked;
+    
+    setPrintIncludeTotals(newValue);
+    setPrintIncludeBreakdown(newValue);
+    setPrintIncludeCalendar(newValue);
+    setPrintIncludeEntries(newValue);
+  };  
+
   const saveCategory = async () => {
     if (!newCategoryName.trim()) return;
 
@@ -540,20 +550,99 @@ function HolidayTracker({ session }) {
         @media print {
           .no-print { display: none !important; }
           .print-only { display: block !important; }
-          body { background: white !important; }
+          body { 
+            background: white !important; 
+            margin: 0 !important;
+            padding: 0 !important;
+          }
           .bg-gradient-to-br { background: white !important; }
           * { 
             -webkit-print-color-adjust: exact !important;
             print-color-adjust: exact !important;
             color-adjust: exact !important;
           }
-          .month-calendar { page-break-inside: avoid; }
+          
+          /* Ensure calendar section fits on one page */
+          .bg-white.rounded-xl.shadow-lg {
+            page-break-inside: avoid !important;
+            box-shadow: none !important;
+            margin-bottom: 0 !important;
+          }
+          
+          /* Monthly calendar */
+          .month-calendar { 
+            page-break-inside: avoid !important;
+            padding: 0.5rem !important;
+          }
+          
+          .month-calendar .grid {
+            gap: 0.25rem !important;
+          }
+          
+          /* Year view calendar */
           .year-view-grid { 
             display: grid !important;
             grid-template-columns: repeat(3, 1fr) !important;
-            gap: 1rem !important;
+            gap: 0.5rem !important;
+            page-break-inside: avoid !important;
+            padding: 0.5rem !important;
           }
-          h1, h2 { page-break-after: avoid; }
+          
+          .year-view-grid > div {
+            padding: 0.25rem !important;
+          }
+          
+          .year-view-grid .grid-cols-7 {
+            gap: 0.125rem !important;
+          }
+          
+          .year-view-grid .text-xs {
+            font-size: 0.625rem !important;
+          }
+          
+          /* Reduce spacing in print */
+          .container {
+            padding-left: 0.5rem !important;
+            padding-right: 0.5rem !important;
+          }
+          
+          .mb-6, .sm\\:mb-8 {
+            margin-bottom: 0.5rem !important;
+          }
+          
+          .p-4, .sm\\:p-6 {
+            padding: 0.5rem !important;
+          }
+          
+          /* Scale down for print */
+          @page {
+            size: auto;
+            margin: 10mm;
+          }
+          
+          /* Ensure legend stays with calendar */
+          .mt-4.flex.flex-wrap {
+            margin-top: 0.5rem !important;
+            page-break-before: avoid !important;
+            font-size: 0.75rem !important;
+          }
+          
+          .mt-2.text-xs {
+            margin-top: 0.25rem !important;
+            font-size: 0.7rem !important;
+            page-break-before: avoid !important;
+          }
+          
+          h1, h2 { 
+            page-break-after: avoid !important;
+            margin-bottom: 0.5rem !important;
+          }
+          
+          /* Force calendar to scale to fit */
+          .year-view-grid, .month-calendar {
+            transform: scale(0.95);
+            transform-origin: top center;
+          }
         }
         .print-only { display: none; }
       `}</style>
@@ -676,6 +765,18 @@ function HolidayTracker({ session }) {
         <div className="no-print fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-lg p-6 max-w-md w-full">
             <h2 className="text-xl font-semibold mb-4">Print Options</h2>
+            
+            <div className="mb-4 pb-3 border-b border-gray-200">
+              <button
+                onClick={toggleAllPrintOptions}
+                className="text-sm text-blue-600 hover:text-blue-700 font-medium"
+              >
+                {(printIncludeTotals && printIncludeBreakdown && printIncludeCalendar && printIncludeEntries)
+                  ? '✓ Deselect All'
+                  : 'Select All'}
+              </button>
+            </div>
+            
             <div className="space-y-3">
               <label className="flex items-center gap-2">
                 <input
@@ -689,20 +790,20 @@ function HolidayTracker({ session }) {
               <label className="flex items-center gap-2">
                 <input
                   type="checkbox"
-                  checked={printIncludeBreakdown}
-                  onChange={(e) => setPrintIncludeBreakdown(e.target.checked)}
-                  className="w-4 h-4"
-                />
-                <span>Include Category Breakdown</span>
-              </label>
-              <label className="flex items-center gap-2">
-                <input
-                  type="checkbox"
                   checked={printIncludeCalendar}
                   onChange={(e) => setPrintIncludeCalendar(e.target.checked)}
                   className="w-4 h-4"
                 />
                 <span>Include Calendar</span>
+              </label>              
+              <label className="flex items-center gap-2">
+                <input
+                  type="checkbox"
+                  checked={printIncludeBreakdown}
+                  onChange={(e) => setPrintIncludeBreakdown(e.target.checked)}
+                  className="w-4 h-4"
+                />
+                <span>Include Category Breakdown</span>
               </label>
               <label className="flex items-center gap-2">
                 <input
