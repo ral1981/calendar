@@ -733,37 +733,55 @@ function HolidayTracker({ session }) {
         </div>
       )}
 
-      <div className="container mx-auto px-4 py-4 sm:py-8">
+      <div className="sticky top-0 z-40 bg-gradient-to-br from-indigo-50 via-blue-50 to-cyan-50 no-print">
+        <div className="container mx-auto px-4 py-4">
+          <div className="max-w-6xl mx-auto">
+            <div className="flex justify-between items-start">
+              <div className="flex-1">
+                <h1 className="text-2xl sm:text-3xl font-bold text-gray-800 mb-2">Holiday Tracker</h1>
+                <p className="text-sm sm:text-base text-gray-600">{session.user.email}</p>
+              </div>
+              <div className="flex gap-2">
+                <button
+                  onClick={() => setShowCategoryManager(true)}
+                  className="p-2 text-gray-600 hover:text-gray-800 hover:bg-white rounded-lg transition-colors"
+                  title="Manage Categories"
+                >
+                  <Settings className="w-5 h-5" />
+                </button>
+                <button
+                  onClick={() => setShowPrintOptions(true)}
+                  className="p-2 text-gray-600 hover:text-gray-800 hover:bg-white rounded-lg transition-colors"
+                  title="Print"
+                >
+                  <Printer className="w-5 h-5" />
+                </button>
+                <button
+                  onClick={handleSignOut}
+                  className="p-2 text-gray-600 hover:text-gray-800 hover:bg-white rounded-lg transition-colors"
+                  title="Sign Out"
+                >
+                  <LogOut className="w-5 h-5" />
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div className="print-only container mx-auto px-4 py-4">
         <div className="max-w-6xl mx-auto">
           <div className="flex justify-between items-start mb-6">
             <div className="flex-1">
               <h1 className="text-2xl sm:text-3xl font-bold text-gray-800 mb-2">Holiday Tracker</h1>
               <p className="text-sm sm:text-base text-gray-600">{session.user.email}</p>
             </div>
-            <div className="flex gap-2 no-print">
-              <button
-                onClick={() => setShowCategoryManager(true)}
-                className="p-2 text-gray-600 hover:text-gray-800 hover:bg-white rounded-lg transition-colors"
-                title="Manage Categories"
-              >
-                <Settings className="w-5 h-5" />
-              </button>
-              <button
-                onClick={() => setShowPrintOptions(true)}
-                className="p-2 text-gray-600 hover:text-gray-800 hover:bg-white rounded-lg transition-colors"
-                title="Print"
-              >
-                <Printer className="w-5 h-5" />
-              </button>
-              <button
-                onClick={handleSignOut}
-                className="p-2 text-gray-600 hover:text-gray-800 hover:bg-white rounded-lg transition-colors"
-                title="Sign Out"
-              >
-                <LogOut className="w-5 h-5" />
-              </button>
-            </div>
           </div>
+        </div>
+      </div>
+
+      <div className="container mx-auto px-4 py-4 sm:py-8">
+        <div className="max-w-6xl mx-auto">
 
           {(!isPrinting || printIncludeTotals) && (
             <div className="bg-gradient-to-r from-blue-600 to-indigo-600 rounded-xl p-4 sm:p-6 mb-6 text-white shadow-lg">
